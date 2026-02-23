@@ -1,77 +1,113 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Moq;
 using SportsStore.Controllers;
 using SportsStore.Models;
+using SportsStore.Services.Payments;
 using Xunit;
 
-namespace SportsStore.Tests {
+namespace SportsStore.Tests
+{
+    public class OrderControllerTests
+    {
+        private static OrderController CreateController(
+            Mock<IOrderRepository> repoMock,
+            Cart cart,
+            Mock<IStripePaymentService> stripeMock)
+        {
+            var loggerMock = new Mock<ILogger<OrderController>>();
 
-    public class OrderControllerTests {
+            var controller = new OrderController(repoMock.Object, cart, stripeMock.Object, loggerMock.Object);
 
-        [Fact]
-        public void Cannot_Checkout_Empty_Cart() {
-            // Arrange - create a mock repository
-            Mock<IOrderRepository> mock = new Mock<IOrderRepository>();
-            // Arrange - create an empty cart
-            Cart cart = new Cart();
-            // Arrange - create the order
-            Order order = new Order();
-            // Arrange - create an instance of the controller
-            OrderController target = new OrderController(mock.Object, cart);
+            var httpContext = new DefaultHttpContext();
+            httpContext.Session = new TestSession();
+            controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 
-            // Act
-            ViewResult? result = target.Checkout(order) as ViewResult;
+            // URLs precisam existir para o controller construir success/cancel
+            httpContext.Request.Scheme = "https";
+            httpContext.Request.Host = new HostString("localhost");
 
-            // Assert - check that the order hasn't been stored 
-            mock.Verify(m => m.SaveOrder(It.IsAny<Order>()), Times.Never);
-            // Assert - check that the method is returning the default view
-            Assert.True(string.IsNullOrEmpty(result?.ViewName));
-            // Assert - check that I am passing an invalid model to the view
-            Assert.False(result?.ViewData.ModelState.IsValid);
+            return controller;
         }
 
         [Fact]
-        public void Cannot_Checkout_Invalid_ShippingDetails() {
+        public async Task Cannot_Checkout_Empty_Cart()
+        {
+            var repoMock = new Mock<IOrderRepository>();
+            var stripeMock = new Mock<IStripePaymentService>();
+            var cart = new Cart();
 
-            // Arrange - create a mock order repository
-            Mock<IOrderRepository> mock = new Mock<IOrderRepository>();
-            // Arrange - create a cart with one item
-            Cart cart = new Cart();
-            cart.AddItem(new Product(), 1);
-            // Arrange - create an instance of the controller
-            OrderController target = new OrderController(mock.Object, cart);
-            // Arrange - add an error to the model
-            target.ModelState.AddModelError("error", "error");
+            var controller = CreateController(repoMock, cart, stripeMock);
 
-            // Act - try to checkout
-            ViewResult? result = target.Checkout(new Order()) as ViewResult;
+            var result = await controller.Checkout(new Order());
 
-            // Assert - check that the order hasn't been passed stored
-            mock.Verify(m => m.SaveOrder(It.IsAny<Order>()), Times.Never);
-            // Assert - check that the method is returning the default view
-            Assert.True(string.IsNullOrEmpty(result?.ViewName));
-            // Assert - check that I am passing an invalid model to the view
-            Assert.False(result?.ViewData.ModelState.IsValid);
+            var view = Assert.IsType<ViewResult>(result);
+            repoMock.Verify(m => m.SaveOrder(It.IsAny<Order>()), Times.Never);
+            Assert.False(view.ViewData.ModelState.IsValid);
         }
 
         [Fact]
-        public void Can_Checkout_And_Submit_Order() {
-            // Arrange - create a mock order repository
-            Mock<IOrderRepository> mock = new Mock<IOrderRepository>();
-            // Arrange - create a cart with one item
-            Cart cart = new Cart();
-            cart.AddItem(new Product(), 1);
-            // Arrange - create an instance of the controller
-            OrderController target = new OrderController(mock.Object, cart);
+        public async Task Cannot_Checkout_Invalid_ShippingDetails()
+        {
+            var repoMock = new Mock<IOrderRepository>();
+            var stripeMock = new Mock<IStripePaymentService>();
 
-            // Act - try to checkout
-            RedirectToPageResult? result =
-                    target.Checkout(new Order()) as RedirectToPageResult;
+            var cart = new Cart();
+            cart.AddItem(new Product { Name = "Test", Price = 10m }, 1);
 
-            // Assert - check that the order has been stored
-            mock.Verify(m => m.SaveOrder(It.IsAny<Order>()), Times.Once);
-            // Assert - check that the method is redirecting to the Completed action
-            Assert.Equal("/Completed", result?.PageName);
+            var controller = CreateController(repoMock, cart, stripeMock);
+            controller.ModelState.AddModelError("error", "error");
+
+            var result = await controller.Checkout(new Order());
+
+            var view = Assert.IsType<ViewResult>(result);
+            repoMock.Verify(m => m.SaveOrder(It.IsAny<Order>()), Times.Never);
+            Assert.False(view.ViewData.ModelState.IsValid);
         }
+
+        [Fact]
+        public async Task Checkout_Redirects_To_Stripe_And_Does_Not_Save_Order_Yet()
+        {
+            var repoMock = new Mock<IOrderRepository>();
+            var stripeMock = new Mock<IStripePaymentService>();
+
+            var cart = new Cart();
+            cart.AddItem(new Product { Name = "Test", Price = 10m }, 1);
+
+            stripeMock
+                .Setup(s => s.CreateCheckoutUrlAsync(It.IsAny<Cart>(), It.IsAny<string>(), It.IsAny<string>()))
+                .ReturnsAsync("https://stripe.test/checkout");
+
+            var controller = CreateController(repoMock, cart, stripeMock);
+
+            var result = await controller.Checkout(new Order { Name = "A", Line1 = "L1", City = "C", State = "S", Country = "BR" });
+
+            var redirect = Assert.IsType<RedirectResult>(result);
+            Assert.Equal("https://stripe.test/checkout", redirect.Url);
+
+            repoMock.Verify(m => m.SaveOrder(It.IsAny<Order>()), Times.Never);
+        }
+    }
+
+    internal class TestSession : ISession
+    {
+        private readonly Dictionary<string, byte[]> _store = new();
+
+        public IEnumerable<string> Keys => _store.Keys;
+        public string Id => Guid.NewGuid().ToString();
+        public bool IsAvailable => true;
+
+        public void Clear() => _store.Clear();
+        public Task CommitAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task LoadAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public void Remove(string key) => _store.Remove(key);
+
+        public void Set(string key, byte[] value) => _store[key] = value;
+        public bool TryGetValue(string key, out byte[] value) => _store.TryGetValue(key, out value!);
     }
 }
