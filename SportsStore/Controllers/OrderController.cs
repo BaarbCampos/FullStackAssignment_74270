@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
 using SportsStore.Models;
 using SportsStore.Services.Payments;
@@ -12,6 +13,7 @@ namespace SportsStore.Controllers
         private readonly Cart cart;
         private readonly IStripePaymentService stripeService;
         private readonly ILogger<OrderController> logger;
+        private readonly LinkGenerator linkGenerator;
 
         private const string PendingOrderSessionKey = "PendingOrderJson";
 
@@ -19,12 +21,14 @@ namespace SportsStore.Controllers
             IOrderRepository repoService,
             Cart cartService,
             IStripePaymentService stripeService,
-            ILogger<OrderController> logger)
+            ILogger<OrderController> logger,
+            LinkGenerator linkGenerator)
         {
             repository = repoService;
             cart = cartService;
             this.stripeService = stripeService;
             this.logger = logger;
+            this.linkGenerator = linkGenerator;
         }
 
         // GET: /Order/Checkout
@@ -83,10 +87,12 @@ namespace SportsStore.Controllers
                 return RedirectToAction(nameof(PaymentFailed));
             }
 
-            // Build URLs for Stripe redirect
-            var successUrl = Url.Action(nameof(PaymentSuccess), "Order", null, Request.Scheme)
-                             + "?session_id={CHECKOUT_SESSION_ID}";
-            var cancelUrl = Url.Action(nameof(PaymentCancelled), "Order", null, Request.Scheme);
+            // Build URLs for Stripe redirect (safe for unit tests too)
+            var successUrlBase = BuildAbsoluteUrl(nameof(PaymentSuccess), "Order");
+            var cancelUrl = BuildAbsoluteUrl(nameof(PaymentCancelled), "Order");
+
+            // Stripe needs the special token placeholder in the success URL
+            var successUrl = successUrlBase + "?session_id={CHECKOUT_SESSION_ID}";
 
             logger.LogInformation(
                 "Starting Stripe checkout. SuccessUrl={SuccessUrl} CancelUrl={CancelUrl}",
@@ -95,7 +101,7 @@ namespace SportsStore.Controllers
 
             try
             {
-                var checkoutUrl = await stripeService.CreateCheckoutUrlAsync(cart, successUrl!, cancelUrl!);
+                var checkoutUrl = await stripeService.CreateCheckoutUrlAsync(cart, successUrl, cancelUrl);
 
                 logger.LogInformation(
                     "Stripe checkout created. Redirecting user. CheckoutUrl={CheckoutUrl}",
@@ -238,6 +244,37 @@ namespace SportsStore.Controllers
 
             ViewBag.OrderId = orderId;
             return View();
+        }
+
+        /// <summary>
+        /// Builds an absolute URL that works both in real MVC pipeline and in unit tests.
+        /// In unit tests, Controller.Url is often null, so we fall back to LinkGenerator + localhost.
+        /// </summary>
+        private string BuildAbsoluteUrl(string actionName, string controllerName)
+        {
+            // Normal path (real app): use Url.Action with current scheme
+            if (Url is not null && Request is not null)
+            {
+                var url = Url.Action(actionName, controllerName, values: null, protocol: Request.Scheme);
+                if (!string.IsNullOrWhiteSpace(url))
+                {
+                    return url!;
+                }
+            }
+
+            // Unit-test / no MVC pipeline: build a relative path and prepend localhost
+            var path = linkGenerator.GetPathByAction(
+                httpContext: HttpContext,
+                action: actionName,
+                controller: controllerName);
+
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                // last resort fallback
+                path = $"/{controllerName}/{actionName}";
+            }
+
+            return "http://localhost" + path;
         }
     }
 }

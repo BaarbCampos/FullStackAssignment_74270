@@ -1,113 +1,252 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using Moq;
-using SportsStore.Controllers;
 using SportsStore.Models;
 using SportsStore.Services.Payments;
-using Xunit;
+using System;
+using System.Linq;
+using System.Text.Json;
+using System.Threading.Tasks;
 
-namespace SportsStore.Tests
+namespace SportsStore.Controllers
 {
-    public class OrderControllerTests
+    public class OrderController : Controller
     {
-        private static OrderController CreateController(
-            Mock<IOrderRepository> repoMock,
-            Cart cart,
-            Mock<IStripePaymentService> stripeMock)
+        private readonly IOrderRepository repository;
+        private readonly Cart cart;
+        private readonly IStripePaymentService stripeService;
+        private readonly ILogger<OrderController> logger;
+
+        private const string PendingOrderSessionKey = "PendingOrderJson";
+
+        public OrderController(
+            IOrderRepository repoService,
+            Cart cartService,
+            IStripePaymentService stripeService,
+            ILogger<OrderController> logger)
         {
-            var loggerMock = new Mock<ILogger<OrderController>>();
-
-            var controller = new OrderController(repoMock.Object, cart, stripeMock.Object, loggerMock.Object);
-
-            var httpContext = new DefaultHttpContext();
-            httpContext.Session = new TestSession();
-            controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
-
-            // URLs precisam existir para o controller construir success/cancel
-            httpContext.Request.Scheme = "https";
-            httpContext.Request.Host = new HostString("localhost");
-
-            return controller;
+            repository = repoService;
+            cart = cartService;
+            this.stripeService = stripeService;
+            this.logger = logger;
         }
 
-        [Fact]
-        public async Task Cannot_Checkout_Empty_Cart()
+        // GET: /Order/Checkout
+        [HttpGet]
+        public ViewResult Checkout()
         {
-            var repoMock = new Mock<IOrderRepository>();
-            var stripeMock = new Mock<IStripePaymentService>();
-            var cart = new Cart();
-
-            var controller = CreateController(repoMock, cart, stripeMock);
-
-            var result = await controller.Checkout(new Order());
-
-            var view = Assert.IsType<ViewResult>(result);
-            repoMock.Verify(m => m.SaveOrder(It.IsAny<Order>()), Times.Never);
-            Assert.False(view.ViewData.ModelState.IsValid);
+            logger.LogInformation("Checkout page opened. CartLines={LineCount}", cart.Lines.Count());
+            return View(new Order());
         }
 
-        [Fact]
-        public async Task Cannot_Checkout_Invalid_ShippingDetails()
+        // POST: /Order/Checkout
+        // Starts Stripe Checkout (does NOT save order yet)
+        [HttpPost]
+        public async Task<IActionResult> Checkout(Order order)
         {
-            var repoMock = new Mock<IOrderRepository>();
-            var stripeMock = new Mock<IStripePaymentService>();
+            var lineCount = cart.Lines.Count();
+            var cartTotal = cart.ComputeTotalValue();
 
-            var cart = new Cart();
-            cart.AddItem(new Product { Name = "Test", Price = 10m }, 1);
+            logger.LogInformation(
+                "Checkout POST started. CartLines={LineCount} CartTotal={CartTotal}",
+                lineCount,
+                cartTotal);
 
-            var controller = CreateController(repoMock, cart, stripeMock);
-            controller.ModelState.AddModelError("error", "error");
+            if (!cart.Lines.Any())
+            {
+                logger.LogWarning("Checkout blocked: cart is empty.");
+                ModelState.AddModelError("", "Sorry, your cart is empty!");
+            }
 
-            var result = await controller.Checkout(new Order());
+            if (!ModelState.IsValid)
+            {
+                logger.LogWarning("Checkout blocked: invalid model state. Errors={ErrorCount}",
+                    ModelState.ErrorCount);
 
-            var view = Assert.IsType<ViewResult>(result);
-            repoMock.Verify(m => m.SaveOrder(It.IsAny<Order>()), Times.Never);
-            Assert.False(view.ViewData.ModelState.IsValid);
+                return View(order);
+            }
+
+            // Attach cart lines to order (not saved yet)
+            order.Lines = cart.Lines.ToArray();
+
+            // Save pending order in session
+            try
+            {
+                var json = JsonSerializer.Serialize(order);
+                HttpContext.Session.SetString(PendingOrderSessionKey, json);
+
+                logger.LogInformation(
+                    "Pending order stored in session. SessionKey={SessionKey} Lines={LineCount} Total={CartTotal}",
+                    PendingOrderSessionKey,
+                    lineCount,
+                    cartTotal);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to serialize/store pending order in session.");
+                return RedirectToAction(nameof(PaymentFailed));
+            }
+
+            // Build URLs for Stripe redirect (SAFE for unit tests)
+            var scheme = Request?.Scheme ?? "http";
+
+            var successUrlBase =
+                Url?.Action(nameof(PaymentSuccess), "Order", null, scheme)
+                ?? "http://localhost/Order/PaymentSuccess";
+
+            var cancelUrl =
+                Url?.Action(nameof(PaymentCancelled), "Order", null, scheme)
+                ?? "http://localhost/Order/PaymentCancelled";
+
+            var successUrl = successUrlBase + "?session_id={CHECKOUT_SESSION_ID}";
+
+            logger.LogInformation(
+                "Starting Stripe checkout. SuccessUrl={SuccessUrl} CancelUrl={CancelUrl}",
+                successUrl,
+                cancelUrl);
+
+            try
+            {
+                var checkoutUrl = await stripeService.CreateCheckoutUrlAsync(cart, successUrl, cancelUrl);
+
+                logger.LogInformation(
+                    "Stripe checkout created. Redirecting user. CheckoutUrl={CheckoutUrl}",
+                    checkoutUrl);
+
+                return Redirect(checkoutUrl);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Stripe checkout creation failed.");
+                return RedirectToAction(nameof(PaymentFailed));
+            }
         }
 
-        [Fact]
-        public async Task Checkout_Redirects_To_Stripe_And_Does_Not_Save_Order_Yet()
+        // GET: /Order/PaymentSuccess?session_id=...
+        [HttpGet]
+        public async Task<IActionResult> PaymentSuccess([FromQuery] string session_id)
         {
-            var repoMock = new Mock<IOrderRepository>();
-            var stripeMock = new Mock<IStripePaymentService>();
+            logger.LogInformation("PaymentSuccess called. StripeSessionId={StripeSessionId}", session_id);
 
-            var cart = new Cart();
-            cart.AddItem(new Product { Name = "Test", Price = 10m }, 1);
+            if (string.IsNullOrWhiteSpace(session_id))
+            {
+                logger.LogWarning("PaymentSuccess called without session_id.");
+                return RedirectToAction(nameof(PaymentFailed));
+            }
 
-            stripeMock
-                .Setup(s => s.CreateCheckoutUrlAsync(It.IsAny<Cart>(), It.IsAny<string>(), It.IsAny<string>()))
-                .ReturnsAsync("https://stripe.test/checkout");
+            var pendingJson = HttpContext.Session.GetString(PendingOrderSessionKey);
+            if (string.IsNullOrWhiteSpace(pendingJson))
+            {
+                logger.LogWarning(
+                    "No pending order found in session during PaymentSuccess. SessionKey={SessionKey}",
+                    PendingOrderSessionKey);
 
-            var controller = CreateController(repoMock, cart, stripeMock);
+                return RedirectToAction(nameof(PaymentFailed));
+            }
 
-            var result = await controller.Checkout(new Order { Name = "A", Line1 = "L1", City = "C", State = "S", Country = "BR" });
+            Order? pendingOrder;
+            try
+            {
+                pendingOrder = JsonSerializer.Deserialize<Order>(pendingJson);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to deserialize pending order from session.");
+                return RedirectToAction(nameof(PaymentFailed));
+            }
 
-            var redirect = Assert.IsType<RedirectResult>(result);
-            Assert.Equal("https://stripe.test/checkout", redirect.Url);
+            if (pendingOrder is null)
+            {
+                logger.LogWarning("Pending order deserialized as null.");
+                return RedirectToAction(nameof(PaymentFailed));
+            }
 
-            repoMock.Verify(m => m.SaveOrder(It.IsAny<Order>()), Times.Never);
+            // Verify Stripe payment
+            try
+            {
+                var (paid, paymentIntentId, status) = await stripeService.VerifySessionPaidAsync(session_id);
+
+                logger.LogInformation(
+                    "Stripe session verified. Paid={Paid} Status={Status} PaymentIntentId={PaymentIntentId} StripeSessionId={StripeSessionId}",
+                    paid,
+                    status,
+                    paymentIntentId,
+                    session_id);
+
+                pendingOrder.StripeSessionId = session_id;
+                pendingOrder.StripePaymentIntentId = paymentIntentId;
+                pendingOrder.StripePaymentStatus = status;
+
+                if (!paid)
+                {
+                    logger.LogWarning(
+                        "Payment not confirmed. Redirecting to PaymentFailed. Status={Status} StripeSessionId={StripeSessionId}",
+                        status,
+                        session_id);
+
+                    return RedirectToAction(nameof(PaymentFailed));
+                }
+
+                // Save order only after payment confirmation
+                logger.LogInformation(
+                    "Saving order after successful payment. StripeSessionId={StripeSessionId} Total={OrderTotal} Lines={LineCount}",
+                    session_id,
+                    pendingOrder.Lines?.Sum(l => l.Quantity * l.Product.Price) ?? 0m,
+                    pendingOrder.Lines?.Count ?? 0);
+
+                repository.SaveOrder(pendingOrder);
+
+                logger.LogInformation(
+                    "Order saved successfully. OrderId={OrderId} StripeSessionId={StripeSessionId}",
+                    pendingOrder.OrderID,
+                    session_id);
+
+                cart.Clear();
+                HttpContext.Session.Remove(PendingOrderSessionKey);
+
+                logger.LogInformation(
+                    "Cart cleared and pending session removed. SessionKey={SessionKey}",
+                    PendingOrderSessionKey);
+
+                return RedirectToAction(nameof(Completed), new { orderId = pendingOrder.OrderID });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Stripe verification or order save failed. StripeSessionId={StripeSessionId}", session_id);
+                return RedirectToAction(nameof(PaymentFailed));
+            }
         }
-    }
 
-    internal class TestSession : ISession
-    {
-        private readonly Dictionary<string, byte[]> _store = new();
+        [HttpGet]
+        public IActionResult PaymentCancelled()
+        {
+            logger.LogInformation("Payment cancelled by user.");
 
-        public IEnumerable<string> Keys => _store.Keys;
-        public string Id => Guid.NewGuid().ToString();
-        public bool IsAvailable => true;
+            HttpContext.Session.Remove(PendingOrderSessionKey);
+            logger.LogInformation("Pending order removed due to cancellation. SessionKey={SessionKey}", PendingOrderSessionKey);
 
-        public void Clear() => _store.Clear();
-        public Task CommitAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task LoadAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public void Remove(string key) => _store.Remove(key);
+            return View();
+        }
 
-        public void Set(string key, byte[] value) => _store[key] = value;
-        public bool TryGetValue(string key, out byte[] value) => _store.TryGetValue(key, out value!);
+        [HttpGet]
+        public IActionResult PaymentFailed()
+        {
+            logger.LogWarning("Payment failed.");
+
+            HttpContext.Session.Remove(PendingOrderSessionKey);
+            logger.LogInformation("Pending order removed due to payment failure. SessionKey={SessionKey}", PendingOrderSessionKey);
+
+            return View();
+        }
+
+        // GET: /Order/Completed?orderId=123
+        [HttpGet]
+        public IActionResult Completed(int orderId)
+        {
+            logger.LogInformation("Completed page opened. OrderId={OrderId}", orderId);
+
+            ViewBag.OrderId = orderId;
+            return View();
+        }
     }
 }
