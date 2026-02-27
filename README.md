@@ -1,3 +1,6 @@
+
+Barbara Campos 74270
+
 # SportsStore – .NET Upgrade & Stripe Integration
 
 ## Overview
@@ -54,6 +57,5 @@ Workflow status: Passing
 
 ---
 
-## Author
 
-Barbara Campos 74270
+
