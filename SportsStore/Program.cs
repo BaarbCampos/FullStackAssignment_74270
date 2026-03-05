@@ -33,7 +33,7 @@ builder.Services.AddDbContext<AppIdentityDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("IdentityConnection"));
 });
 
-// Repos
+// Repositories
 builder.Services.AddScoped<IStoreRepository, EFStoreRepository>();
 builder.Services.AddScoped<IOrderRepository, EFOrderRepository>();
 
@@ -42,6 +42,7 @@ builder.Services.AddScoped<IStripePaymentService, StripePaymentService>();
 
 // Session + Cart
 builder.Services.AddDistributedMemoryCache();
+
 builder.Services.AddSession(options =>
 {
     options.IdleTimeout = TimeSpan.FromMinutes(30);
@@ -56,32 +57,36 @@ builder.Services.AddScoped<Cart>(sp => SessionCart.GetCart(sp));
 builder.Services.AddIdentity<IdentityUser, IdentityRole>()
     .AddEntityFrameworkStores<AppIdentityDbContext>();
 
+// --------------------
+// BUILD APP
+// --------------------
 var app = builder.Build();
 
 // --------------------
-// STARTUP LOGS
+// STARTUP LOG
 // --------------------
-app.Logger.LogInformation("Application starting. Env={Env}", app.Environment.EnvironmentName);
+app.Logger.LogInformation("Application starting. Environment: {Env}", app.Environment.EnvironmentName);
 
-// Stripe key config (secure)
+// --------------------
+// STRIPE CONFIGURATION
+// --------------------
 var stripeKey = app.Configuration["Stripe:SecretKey"];
+
 if (string.IsNullOrWhiteSpace(stripeKey))
 {
-    app.Logger.LogWarning("Stripe SecretKey is NOT configured. Payments will fail until Stripe:SecretKey is set via User Secrets or Environment Variables.");
+    app.Logger.LogWarning("Stripe SecretKey is NOT configured. Payments will fail until Stripe:SecretKey is set.");
 }
 else
 {
-    // Configure Stripe globally (SDK)
     StripeConfiguration.ApiKey = stripeKey;
-    app.Logger.LogInformation("Stripe is configured (SecretKey loaded from configuration).");
+    app.Logger.LogInformation("Stripe successfully configured.");
 }
 
-// Request logging (Serilog)
+// --------------------
+// MIDDLEWARE
+// --------------------
 app.UseSerilogRequestLogging();
 
-// --------------------
-// PIPELINE
-// --------------------
 if (app.Environment.IsProduction())
 {
     app.UseExceptionHandler("/error");
@@ -100,7 +105,7 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
-app.UseSession(); // session antes de auth
+app.UseSession();
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -108,23 +113,30 @@ app.UseAuthorization();
 // --------------------
 // ROUTES
 // --------------------
-app.MapControllerRoute("catpage",
-    "{category}/Page{productPage:int}",
-    new { Controller = "Home", action = "Index" });
+app.MapControllerRoute(
+    name: "catpage",
+    pattern: "{category}/Page{productPage:int}",
+    defaults: new { Controller = "Home", action = "Index" });
 
-app.MapControllerRoute("page", "Page{productPage:int}",
-    new { Controller = "Home", action = "Index", productPage = 1 });
+app.MapControllerRoute(
+    name: "page",
+    pattern: "Page{productPage:int}",
+    defaults: new { Controller = "Home", action = "Index", productPage = 1 });
 
-app.MapControllerRoute("category", "{category}",
-    new { Controller = "Home", action = "Index", productPage = 1 });
+app.MapControllerRoute(
+    name: "category",
+    pattern: "{category}",
+    defaults: new { Controller = "Home", action = "Index", productPage = 1 });
 
-app.MapControllerRoute("pagination",
-    "Products/Page{productPage}",
-    new { Controller = "Home", action = "Index", productPage = 1 });
+app.MapControllerRoute(
+    name: "pagination",
+    pattern: "Products/Page{productPage}",
+    defaults: new { Controller = "Home", action = "Index", productPage = 1 });
 
 app.MapDefaultControllerRoute();
 
 app.MapRazorPages();
+
 app.MapFallbackToPage("/admin/{*catchall}", "/Admin/Index");
 
 // --------------------
@@ -133,4 +145,7 @@ app.MapFallbackToPage("/admin/{*catchall}", "/Admin/Index");
 SeedData.EnsurePopulated(app);
 IdentitySeedData.EnsurePopulated(app);
 
+// --------------------
+// RUN
+// --------------------
 app.Run();
