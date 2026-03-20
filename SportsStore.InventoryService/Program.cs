@@ -1,3 +1,5 @@
+using SportsStore.InventoryService;
+
 var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddHostedService<Worker>();
 
