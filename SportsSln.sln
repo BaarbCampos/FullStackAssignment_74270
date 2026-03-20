@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SportsStore.Shared", "Sport
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SportsStore.OrderApi", "SportsStore.OrderApi\SportsStore.OrderApi.csproj", "{2AB7059D-21EF-45AF-A99C-BBCB915E936E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SportsStore.InventoryService", "SportsStore.InventoryService\SportsStore.InventoryService.csproj", "{71D56B1D-D7A2-40B1-8B06-894DD1801744}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{2AB7059D-21EF-45AF-A99C-BBCB915E936E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2AB7059D-21EF-45AF-A99C-BBCB915E936E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2AB7059D-21EF-45AF-A99C-BBCB915E936E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{71D56B1D-D7A2-40B1-8B06-894DD1801744}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{71D56B1D-D7A2-40B1-8B06-894DD1801744}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{71D56B1D-D7A2-40B1-8B06-894DD1801744}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{71D56B1D-D7A2-40B1-8B06-894DD1801744}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
