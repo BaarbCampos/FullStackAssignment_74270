@@ -7,10 +7,9 @@ public class InMemoryOrderService : IOrderService
 {
     private readonly List<Order> _orders = new();
 
-    public Order CreateOrder(Order order)
+    public void CreateOrder(Order order)
     {
         _orders.Add(order);
-        return order;
     }
 
     public Order? GetById(Guid id)
@@ -18,16 +17,14 @@ public class InMemoryOrderService : IOrderService
         return _orders.FirstOrDefault(o => o.Id == id);
     }
 
-    public bool UpdateStatus(Guid id, OrderStatus status)
+    // 🔥 MÉTODO CORRETO
+    public void UpdateOrderStatus(Guid id, int status)
     {
         var order = _orders.FirstOrDefault(o => o.Id == id);
 
-        if (order is null)
+        if (order != null)
         {
-            return false;
+            order.Status = (OrderStatus)status;
         }
-
-        order.Status = status;
-        return true;
     }
 }

@@ -59,19 +59,13 @@ public class ShippingCreatedConsumer : BackgroundService
             using var scope = _scopeFactory.CreateScope();
             var orderService = scope.ServiceProvider.GetRequiredService<IOrderService>();
 
-            var updated = orderService.UpdateStatus(
+            // 🔥 CORREÇÃO AQUI
+            orderService.UpdateOrderStatus(
                 shippingCreated.OrderId,
-                OrderStatus.Completed
+                (int)OrderStatus.Completed
             );
 
-            if (updated)
-            {
-                Console.WriteLine($"✅ Order {shippingCreated.OrderId} updated to Completed.");
-            }
-            else
-            {
-                Console.WriteLine($"⚠️ Order {shippingCreated.OrderId} not found.");
-            }
+            Console.WriteLine($"✅ Order {shippingCreated.OrderId} updated to Completed.");
         };
 
         channel.BasicConsume(
