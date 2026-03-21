@@ -1,4 +1,5 @@
 using SportsStore.OrderApi.Configuration;
+using SportsStore.OrderApi.Consumers;
 using SportsStore.OrderApi.Messaging;
 using SportsStore.OrderApi.Services;
 
@@ -14,6 +15,8 @@ builder.Services.Configure<RabbitMqSettings>(
 builder.Services.AddSingleton<IOrderService, InMemoryOrderService>();
 builder.Services.AddSingleton<IMessagePublisher, RabbitMqMessagePublisher>();
 
+builder.Services.AddHostedService<ShippingCreatedConsumer>();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -23,9 +26,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
 app.UseAuthorization();
-
 app.MapControllers();
-
 app.Run();

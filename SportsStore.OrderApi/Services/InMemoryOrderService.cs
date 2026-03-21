@@ -1,4 +1,5 @@
 ﻿using SportsStore.OrderApi.Models;
+using SportsStore.Shared.Enums;
 
 namespace SportsStore.OrderApi.Services;
 
@@ -15,5 +16,18 @@ public class InMemoryOrderService : IOrderService
     public Order? GetById(Guid id)
     {
         return _orders.FirstOrDefault(o => o.Id == id);
+    }
+
+    public bool UpdateStatus(Guid id, OrderStatus status)
+    {
+        var order = _orders.FirstOrDefault(o => o.Id == id);
+
+        if (order is null)
+        {
+            return false;
+        }
+
+        order.Status = status;
+        return true;
     }
 }
