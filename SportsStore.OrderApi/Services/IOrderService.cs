@@ -6,7 +6,6 @@ public interface IOrderService
 {
     void CreateOrder(Order order);
     Order? GetById(Guid id);
-
-    // 🔥 TEM QUE EXISTIR ISSO
+    IReadOnlyCollection<Order> GetAll();
     void UpdateOrderStatus(Guid id, int status);
 }

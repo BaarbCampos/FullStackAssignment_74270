@@ -1,42 +1,29 @@
-﻿using RabbitMQ.Client;
+﻿using System.Text;
+using System.Text.Json;
+using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using SportsStore.OrderApi.Services;
 using SportsStore.Shared.Contracts;
 using SportsStore.Shared.Enums;
-using System.Text;
-using System.Text.Json;
 
-namespace SportsStore.OrderApi.Consumers;
+namespace SportsStore.OrderApi.Messaging;
 
 public class ShippingCreatedConsumer : BackgroundService
 {
-    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IOrderService _orderService;
 
-    public ShippingCreatedConsumer(IServiceScopeFactory scopeFactory)
+    public ShippingCreatedConsumer(IOrderService orderService)
     {
-        _scopeFactory = scopeFactory;
+        _orderService = orderService;
     }
 
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var factory = new ConnectionFactory
-        {
-            HostName = "localhost",
-            UserName = "guest",
-            Password = "guest",
-            Port = 5672
-        };
-
+        var factory = new ConnectionFactory() { HostName = "localhost" };
         var connection = factory.CreateConnection();
         var channel = connection.CreateModel();
 
-        channel.QueueDeclare(
-            queue: "shipping-created",
-            durable: false,
-            exclusive: false,
-            autoDelete: false,
-            arguments: null
-        );
+        channel.QueueDeclare("shipping-created", false, false, false, null);
 
         var consumer = new EventingBasicConsumer(channel);
 
@@ -45,34 +32,18 @@ public class ShippingCreatedConsumer : BackgroundService
             var body = ea.Body.ToArray();
             var json = Encoding.UTF8.GetString(body);
 
-            Console.WriteLine("📬 Shipping created event received:");
+            var message = JsonSerializer.Deserialize<ShippingCreated>(json);
+
+            Console.WriteLine("📦 Shipping received in Order API:");
             Console.WriteLine(json);
 
-            var shippingCreated = JsonSerializer.Deserialize<ShippingCreated>(json);
-
-            if (shippingCreated is null)
+            if (message != null)
             {
-                Console.WriteLine("❌ Failed to deserialize ShippingCreated message.");
-                return;
+                _orderService.UpdateOrderStatus(message.OrderId, (int)OrderStatus.Completed);
             }
-
-            using var scope = _scopeFactory.CreateScope();
-            var orderService = scope.ServiceProvider.GetRequiredService<IOrderService>();
-
-            // 🔥 CORREÇÃO AQUI
-            orderService.UpdateOrderStatus(
-                shippingCreated.OrderId,
-                (int)OrderStatus.Completed
-            );
-
-            Console.WriteLine($"✅ Order {shippingCreated.OrderId} updated to Completed.");
         };
 
-        channel.BasicConsume(
-            queue: "shipping-created",
-            autoAck: true,
-            consumer: consumer
-        );
+        channel.BasicConsume(queue: "shipping-created", autoAck: true, consumer: consumer);
 
         return Task.CompletedTask;
     }

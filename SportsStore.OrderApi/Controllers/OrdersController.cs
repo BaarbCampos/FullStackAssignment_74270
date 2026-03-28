@@ -66,15 +66,24 @@ public class OrdersController : ControllerBase
 
         await _messagePublisher.PublishAsync("order-submitted", orderSubmitted);
 
+        _orderService.UpdateOrderStatus(order.Id, (int)OrderStatus.InventoryPending);
+
         var response = new CheckoutResponseDto
         {
             OrderId = order.Id,
-            Status = order.Status,
+            Status = OrderStatus.InventoryPending,
             TotalAmount = order.TotalAmount,
-            Message = "Order submitted successfully."
+            Message = "Order submitted successfully and is waiting for inventory confirmation."
         };
 
         return Ok(response);
+    }
+
+    [HttpGet]
+    public ActionResult<IReadOnlyCollection<Order>> GetAll()
+    {
+        var orders = _orderService.GetAll();
+        return Ok(orders);
     }
 
     [HttpGet("{id:guid}")]
@@ -88,5 +97,22 @@ public class OrdersController : ControllerBase
         }
 
         return Ok(order);
+    }
+
+    [HttpGet("{id:guid}/status")]
+    public ActionResult<object> GetStatus(Guid id)
+    {
+        var order = _orderService.GetById(id);
+
+        if (order == null)
+        {
+            return NotFound();
+        }
+
+        return Ok(new
+        {
+            order.Id,
+            Status = order.Status.ToString()
+        });
     }
 }
