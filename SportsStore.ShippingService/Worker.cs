@@ -8,7 +8,7 @@ namespace SportsStore.ShippingService;
 
 public class Worker : BackgroundService
 {
-    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var factory = new ConnectionFactory()
         {
@@ -22,7 +22,7 @@ public class Worker : BackgroundService
         var channel = connection.CreateModel();
 
         channel.QueueDeclare(
-            queue: "payment-approved",
+            queue: "shipping-requested",
             durable: false,
             exclusive: false,
             autoDelete: false,
@@ -44,20 +44,20 @@ public class Worker : BackgroundService
             var body = ea.Body.ToArray();
             var json = Encoding.UTF8.GetString(body);
 
-            Console.WriteLine("🚚 Payment approval received:");
+            Console.WriteLine("🚚 Shipping request received:");
             Console.WriteLine(json);
 
-            var paymentApproved = JsonSerializer.Deserialize<PaymentApproved>(json);
+            var shippingRequested = JsonSerializer.Deserialize<ShippingRequested>(json);
 
-            if (paymentApproved is null)
+            if (shippingRequested is null)
             {
-                Console.WriteLine("❌ Failed to deserialize PaymentApproved message.");
+                Console.WriteLine("❌ Failed to deserialize ShippingRequested message.");
                 return;
             }
 
             var shippingCreated = new ShippingCreated
             {
-                OrderId = paymentApproved.OrderId,
+                OrderId = shippingRequested.OrderId,
                 CreatedAtUtc = DateTime.UtcNow,
                 TrackingNumber = $"TRK-{Guid.NewGuid().ToString()[..8].ToUpper()}",
                 Message = "Shipping created successfully."
@@ -78,11 +78,11 @@ public class Worker : BackgroundService
         };
 
         channel.BasicConsume(
-            queue: "payment-approved",
+            queue: "shipping-requested",
             autoAck: true,
             consumer: consumer
         );
 
-        return Task.CompletedTask;
+        await Task.Delay(Timeout.Infinite, stoppingToken);
     }
 }

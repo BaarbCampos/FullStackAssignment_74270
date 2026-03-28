@@ -8,7 +8,7 @@ namespace SportsStore.InventoryService;
 
 public class Worker : BackgroundService
 {
-    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var factory = new ConnectionFactory()
         {
@@ -82,6 +82,6 @@ public class Worker : BackgroundService
             consumer: consumer
         );
 
-        return Task.CompletedTask;
+        await Task.Delay(Timeout.Infinite, stoppingToken);
     }
 }
