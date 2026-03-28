@@ -15,7 +15,9 @@ public class PaymentRejectedConsumer : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly RabbitMqSettings _settings;
 
-    public PaymentRejectedConsumer(IServiceScopeFactory scopeFactory, IOptions<RabbitMqSettings> options)
+    public PaymentRejectedConsumer(
+        IServiceScopeFactory scopeFactory,
+        IOptions<RabbitMqSettings> options)
     {
         _scopeFactory = scopeFactory;
         _settings = options.Value;
@@ -34,36 +36,52 @@ public class PaymentRejectedConsumer : BackgroundService
         using var connection = factory.CreateConnection();
         using var channel = connection.CreateModel();
 
-        channel.QueueDeclare(queue: "payment-rejected", durable: false, exclusive: false, autoDelete: false, arguments: null);
+        channel.QueueDeclare(
+            queue: "payment-rejected",
+            durable: false,
+            exclusive: false,
+            autoDelete: false,
+            arguments: null);
 
         var consumer = new EventingBasicConsumer(channel);
 
         consumer.Received += (model, ea) =>
         {
-            var body = ea.Body.ToArray();
-            var json = Encoding.UTF8.GetString(body);
-
-            Console.WriteLine("💥 Payment rejected event received:");
-            Console.WriteLine(json);
-
-            var paymentRejected = JsonSerializer.Deserialize<PaymentRejected>(json);
-
-            if (paymentRejected is null)
+            try
             {
-                Console.WriteLine("❌ Failed to deserialize PaymentRejected message.");
-                return;
+                var body = ea.Body.ToArray();
+                var json = Encoding.UTF8.GetString(body);
+
+                Console.WriteLine("💥 Payment rejected event received:");
+                Console.WriteLine(json);
+
+                var paymentRejected = JsonSerializer.Deserialize<PaymentRejected>(json);
+
+                if (paymentRejected == null)
+                {
+                    Console.WriteLine("❌ Failed to deserialize PaymentRejected message.");
+                    return;
+                }
+
+                using var scope = _scopeFactory.CreateScope();
+                var orderService = scope.ServiceProvider.GetRequiredService<IOrderService>();
+
+                orderService.UpdateOrderStatus(paymentRejected.OrderId, (int)OrderStatus.PaymentFailed);
+                orderService.UpdateOrderStatus(paymentRejected.OrderId, (int)OrderStatus.Failed);
+
+                Console.WriteLine($"❌ Order {paymentRejected.OrderId} marked as FAILED.");
             }
-
-            using var scope = _scopeFactory.CreateScope();
-            var orderService = scope.ServiceProvider.GetRequiredService<IOrderService>();
-
-            orderService.UpdateOrderStatus(paymentRejected.OrderId, (int)OrderStatus.PaymentFailed);
-            orderService.UpdateOrderStatus(paymentRejected.OrderId, (int)OrderStatus.Failed);
-
-            Console.WriteLine($"✅ Order {paymentRejected.OrderId} updated to Failed.");
+            catch (Exception ex)
+            {
+                Console.WriteLine("❌ Error processing payment-rejected message:");
+                Console.WriteLine(ex.Message);
+            }
         };
 
-        channel.BasicConsume(queue: "payment-rejected", autoAck: true, consumer: consumer);
+        channel.BasicConsume(
+            queue: "payment-rejected",
+            autoAck: true,
+            consumer: consumer);
 
         await Task.Delay(Timeout.Infinite, stoppingToken);
     }
