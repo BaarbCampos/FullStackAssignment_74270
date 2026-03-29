@@ -45,27 +45,35 @@ public class InventoryFailedConsumer : BackgroundService
 
         consumer.Received += (model, ea) =>
         {
-            var body = ea.Body.ToArray();
-            var json = Encoding.UTF8.GetString(body);
-
-            Console.WriteLine("❌ Inventory failed event received:");
-            Console.WriteLine(json);
-
-            var inventoryFailed = JsonSerializer.Deserialize<InventoryFailed>(json);
-
-            if (inventoryFailed == null)
+            try
             {
-                Console.WriteLine("❌ Failed to deserialize InventoryFailed message.");
-                return;
+                var body = ea.Body.ToArray();
+                var json = Encoding.UTF8.GetString(body);
+
+                Console.WriteLine("❌ Inventory failed event received:");
+                Console.WriteLine(json);
+
+                var inventoryFailed = JsonSerializer.Deserialize<InventoryFailed>(json);
+
+                if (inventoryFailed == null)
+                {
+                    Console.WriteLine("❌ Failed to deserialize InventoryFailed message.");
+                    return;
+                }
+
+                using var scope = _scopeFactory.CreateScope();
+                var orderService = scope.ServiceProvider.GetRequiredService<IOrderService>();
+
+                orderService.UpdateOrderStatus(inventoryFailed.OrderId, (int)OrderStatus.InventoryFailed);
+                orderService.UpdateOrderStatus(inventoryFailed.OrderId, (int)OrderStatus.Failed);
+
+                Console.WriteLine($"❌ Order {inventoryFailed.OrderId} marked as Failed due to inventory.");
             }
-
-            using var scope = _scopeFactory.CreateScope();
-            var orderService = scope.ServiceProvider.GetRequiredService<IOrderService>();
-
-            orderService.UpdateOrderStatus(inventoryFailed.OrderId, (int)OrderStatus.InventoryFailed);
-            orderService.UpdateOrderStatus(inventoryFailed.OrderId, (int)OrderStatus.Failed);
-
-            Console.WriteLine($"❌ Order {inventoryFailed.OrderId} marked as Failed due to inventory.");
+            catch (Exception ex)
+            {
+                Console.WriteLine("❌ Error processing inventory-failed message:");
+                Console.WriteLine(ex.Message);
+            }
         };
 
         channel.BasicConsume(

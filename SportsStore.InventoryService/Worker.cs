@@ -1,16 +1,14 @@
-﻿using RabbitMQ.Client;
+﻿using Microsoft.Data.Sqlite;
+using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using SportsStore.Shared.Contracts;
 using System.Text;
 using System.Text.Json;
-using Microsoft.Data.Sqlite;
 
 namespace SportsStore.InventoryService;
 
 public class Worker : BackgroundService
 {
-    private const string connectionString = "Data Source=../SportsStore.OrderApi/orders.db";
-
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var factory = new ConnectionFactory()
@@ -24,9 +22,10 @@ public class Worker : BackgroundService
         var connection = factory.CreateConnection();
         var channel = connection.CreateModel();
 
-        channel.QueueDeclare("order-submitted", false, false, false, null);
-        channel.QueueDeclare("inventory-confirmed", false, false, false, null);
-        channel.QueueDeclare("inventory-failed", false, false, false, null);
+        // Filas
+        channel.QueueDeclare("order-submitted", false, false, false);
+        channel.QueueDeclare("inventory-confirmed", false, false, false);
+        channel.QueueDeclare("inventory-failed", false, false, false);
 
         var consumer = new EventingBasicConsumer(channel);
 
@@ -37,6 +36,11 @@ public class Worker : BackgroundService
 
             if (order == null) return;
 
+            Console.WriteLine("📦 Order received:");
+            Console.WriteLine(json);
+
+            var connectionString = "Data Source=../SportsStore.OrderApi/orders.db";
+
             using var db = new SqliteConnection(connectionString);
             db.Open();
 
@@ -44,62 +48,69 @@ public class Worker : BackgroundService
 
             foreach (var item in order.Items)
             {
-                var cmd = db.CreateCommand();
-                cmd.CommandText = "SELECT StockQuantity FROM Products WHERE Id = $id";
-                cmd.Parameters.AddWithValue("$id", item.ProductId);
+                var command = db.CreateCommand();
+                command.CommandText =
+                @"
+                SELECT StockQuantity 
+                FROM Products 
+                WHERE Id = $id
+                ";
+                command.Parameters.AddWithValue("$id", item.ProductId);
 
-                var stock = Convert.ToInt32(cmd.ExecuteScalar());
+                var result = command.ExecuteScalar();
 
-                if (stock < item.Quantity)
+                if (result == null || Convert.ToInt32(result) < item.Quantity)
                 {
                     hasStock = false;
                     break;
                 }
             }
 
+            // ❌ SEM STOCK
             if (!hasStock)
             {
                 var failed = new InventoryFailed
                 {
                     OrderId = order.OrderId,
-                    Reason = "Not enough stock"
+                    FailedAtUtc = DateTime.UtcNow,
+                    Message = "Not enough stock."
                 };
 
                 var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(failed));
 
                 channel.BasicPublish("", "inventory-failed", null, body);
 
-                Console.WriteLine("❌ Inventory failed");
+                Console.WriteLine("❌ Inventory failed!");
                 return;
             }
 
-            // ✅ Deduz stock
+            // ✅ TEM STOCK → Atualiza BD
             foreach (var item in order.Items)
             {
-                var cmd = db.CreateCommand();
-                cmd.CommandText = @"
-                    UPDATE Products 
-                    SET StockQuantity = StockQuantity - $qty 
-                    WHERE Id = $id";
-
-                cmd.Parameters.AddWithValue("$qty", item.Quantity);
-                cmd.Parameters.AddWithValue("$id", item.ProductId);
-
-                cmd.ExecuteNonQuery();
+                var update = db.CreateCommand();
+                update.CommandText =
+                @"
+                UPDATE Products 
+                SET StockQuantity = StockQuantity - $qty 
+                WHERE Id = $id
+                ";
+                update.Parameters.AddWithValue("$qty", item.Quantity);
+                update.Parameters.AddWithValue("$id", item.ProductId);
+                update.ExecuteNonQuery();
             }
 
             var confirmed = new InventoryConfirmed
             {
                 OrderId = order.OrderId,
                 ConfirmedAtUtc = DateTime.UtcNow,
-                Message = "Stock reserved"
+                Message = "Inventory confirmed successfully."
             };
 
             var confirmedBody = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(confirmed));
 
             channel.BasicPublish("", "inventory-confirmed", null, confirmedBody);
 
-            Console.WriteLine("✅ Inventory confirmed");
+            Console.WriteLine("✅ Inventory confirmed!");
         };
 
         channel.BasicConsume("order-submitted", true, consumer);

@@ -1,5 +1,8 @@
-﻿public class InventoryFailed
+﻿namespace SportsStore.Shared.Contracts;
+
+public class InventoryFailed
 {
     public Guid OrderId { get; set; }
-    public string Reason { get; set; } = string.Empty;
+    public DateTime FailedAtUtc { get; set; }
+    public string Message { get; set; } = string.Empty;
 }
