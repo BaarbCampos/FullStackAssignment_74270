@@ -1,5 +1,7 @@
-﻿using SportsStore.OrderApi.Configuration;
+﻿using Microsoft.EntityFrameworkCore;
+using SportsStore.OrderApi.Configuration;
 using SportsStore.OrderApi.Consumers;
+using SportsStore.OrderApi.Data;
 using SportsStore.OrderApi.Messaging;
 using SportsStore.OrderApi.Services;
 
@@ -12,10 +14,14 @@ builder.Services.AddSwaggerGen();
 builder.Services.Configure<RabbitMqSettings>(
     builder.Configuration.GetSection("RabbitMq"));
 
-builder.Services.AddSingleton<IOrderService, InMemoryOrderService>();
+builder.Services.AddDbContext<OrderDbContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddScoped<IOrderService, EfOrderService>();
 builder.Services.AddSingleton<IMessagePublisher, RabbitMqMessagePublisher>();
 
 builder.Services.AddHostedService<InventoryConfirmedConsumer>();
+builder.Services.AddHostedService<InventoryFailedConsumer>();
 builder.Services.AddHostedService<PaymentApprovedConsumer>();
 builder.Services.AddHostedService<PaymentRejectedConsumer>();
 builder.Services.AddHostedService<ShippingCreatedConsumer>();

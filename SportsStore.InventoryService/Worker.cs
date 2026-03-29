@@ -3,12 +3,15 @@ using RabbitMQ.Client.Events;
 using SportsStore.Shared.Contracts;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Data.Sqlite;
 
 namespace SportsStore.InventoryService;
 
 public class Worker : BackgroundService
 {
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    private const string connectionString = "Data Source=../SportsStore.OrderApi/orders.db";
+
+    protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var factory = new ConnectionFactory()
         {
@@ -21,67 +24,86 @@ public class Worker : BackgroundService
         var connection = factory.CreateConnection();
         var channel = connection.CreateModel();
 
-        channel.QueueDeclare(
-            queue: "order-submitted",
-            durable: false,
-            exclusive: false,
-            autoDelete: false,
-            arguments: null
-        );
-
-        channel.QueueDeclare(
-            queue: "inventory-confirmed",
-            durable: false,
-            exclusive: false,
-            autoDelete: false,
-            arguments: null
-        );
+        channel.QueueDeclare("order-submitted", false, false, false, null);
+        channel.QueueDeclare("inventory-confirmed", false, false, false, null);
+        channel.QueueDeclare("inventory-failed", false, false, false, null);
 
         var consumer = new EventingBasicConsumer(channel);
 
         consumer.Received += (model, ea) =>
         {
-            var body = ea.Body.ToArray();
-            var json = Encoding.UTF8.GetString(body);
+            var json = Encoding.UTF8.GetString(ea.Body.ToArray());
+            var order = JsonSerializer.Deserialize<OrderSubmitted>(json);
 
-            Console.WriteLine("📦 Order received:");
-            Console.WriteLine(json);
+            if (order == null) return;
 
-            var orderSubmitted = JsonSerializer.Deserialize<OrderSubmitted>(json);
+            using var db = new SqliteConnection(connectionString);
+            db.Open();
 
-            if (orderSubmitted is null)
+            bool hasStock = true;
+
+            foreach (var item in order.Items)
             {
-                Console.WriteLine("❌ Failed to deserialize OrderSubmitted message.");
+                var cmd = db.CreateCommand();
+                cmd.CommandText = "SELECT StockQuantity FROM Products WHERE Id = $id";
+                cmd.Parameters.AddWithValue("$id", item.ProductId);
+
+                var stock = Convert.ToInt32(cmd.ExecuteScalar());
+
+                if (stock < item.Quantity)
+                {
+                    hasStock = false;
+                    break;
+                }
+            }
+
+            if (!hasStock)
+            {
+                var failed = new InventoryFailed
+                {
+                    OrderId = order.OrderId,
+                    Reason = "Not enough stock"
+                };
+
+                var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(failed));
+
+                channel.BasicPublish("", "inventory-failed", null, body);
+
+                Console.WriteLine("❌ Inventory failed");
                 return;
             }
 
-            var inventoryConfirmed = new InventoryConfirmed
+            // ✅ Deduz stock
+            foreach (var item in order.Items)
             {
-                OrderId = orderSubmitted.OrderId,
+                var cmd = db.CreateCommand();
+                cmd.CommandText = @"
+                    UPDATE Products 
+                    SET StockQuantity = StockQuantity - $qty 
+                    WHERE Id = $id";
+
+                cmd.Parameters.AddWithValue("$qty", item.Quantity);
+                cmd.Parameters.AddWithValue("$id", item.ProductId);
+
+                cmd.ExecuteNonQuery();
+            }
+
+            var confirmed = new InventoryConfirmed
+            {
+                OrderId = order.OrderId,
                 ConfirmedAtUtc = DateTime.UtcNow,
-                Message = "Inventory confirmed successfully."
+                Message = "Stock reserved"
             };
 
-            var confirmedJson = JsonSerializer.Serialize(inventoryConfirmed);
-            var confirmedBody = Encoding.UTF8.GetBytes(confirmedJson);
+            var confirmedBody = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(confirmed));
 
-            channel.BasicPublish(
-                exchange: "",
-                routingKey: "inventory-confirmed",
-                basicProperties: null,
-                body: confirmedBody
-            );
+            channel.BasicPublish("", "inventory-confirmed", null, confirmedBody);
 
-            Console.WriteLine("✅ Inventory confirmed event published:");
-            Console.WriteLine(confirmedJson);
+            Console.WriteLine("✅ Inventory confirmed");
         };
 
-        channel.BasicConsume(
-            queue: "order-submitted",
-            autoAck: true,
-            consumer: consumer
-        );
+        channel.BasicConsume("order-submitted", true, consumer);
 
-        await Task.Delay(Timeout.Infinite, stoppingToken);
+        return Task.CompletedTask;
     }
 }

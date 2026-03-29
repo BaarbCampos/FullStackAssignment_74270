@@ -1,4 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using SportsStore.OrderApi.Data;
 using SportsStore.OrderApi.Messaging;
 using SportsStore.OrderApi.Models;
 using SportsStore.OrderApi.Services;
@@ -14,11 +16,16 @@ public class OrdersController : ControllerBase
 {
     private readonly IOrderService _orderService;
     private readonly IMessagePublisher _messagePublisher;
+    private readonly OrderDbContext _context;
 
-    public OrdersController(IOrderService orderService, IMessagePublisher messagePublisher)
+    public OrdersController(
+        IOrderService orderService,
+        IMessagePublisher messagePublisher,
+        OrderDbContext context)
     {
         _orderService = orderService;
         _messagePublisher = messagePublisher;
+        _context = context;
     }
 
     [HttpPost("checkout")]
@@ -29,7 +36,46 @@ public class OrdersController : ControllerBase
             return BadRequest("The order must contain at least one item.");
         }
 
-        var totalAmount = request.Items.Sum(i => i.Quantity * i.UnitPrice);
+        if (string.IsNullOrWhiteSpace(request.CustomerEmail))
+        {
+            return BadRequest("Customer email is required.");
+        }
+
+        var requestedProductIds = request.Items
+            .Select(i => i.ProductId)
+            .Distinct()
+            .ToList();
+
+        var products = await _context.Products
+            .Where(p => requestedProductIds.Contains(p.Id))
+            .ToListAsync();
+
+        if (products.Count != requestedProductIds.Count)
+        {
+            return BadRequest("One or more selected products do not exist.");
+        }
+
+        var orderItems = new List<OrderItem>();
+
+        foreach (var item in request.Items)
+        {
+            if (item.Quantity <= 0)
+            {
+                return BadRequest("Quantity must be greater than zero.");
+            }
+
+            var product = products.First(p => p.Id == item.ProductId);
+
+            orderItems.Add(new OrderItem
+            {
+                ProductId = product.Id,
+                ProductName = product.Name,
+                Quantity = item.Quantity,
+                UnitPrice = product.Price
+            });
+        }
+
+        var totalAmount = orderItems.Sum(i => i.Quantity * i.UnitPrice);
 
         var order = new Order
         {
@@ -38,13 +84,7 @@ public class OrdersController : ControllerBase
             TotalAmount = totalAmount,
             Status = OrderStatus.Submitted,
             CreatedAtUtc = DateTime.UtcNow,
-            Items = request.Items.Select(i => new OrderItem
-            {
-                ProductId = i.ProductId,
-                ProductName = i.ProductName,
-                Quantity = i.Quantity,
-                UnitPrice = i.UnitPrice
-            }).ToList()
+            Items = orderItems
         };
 
         _orderService.CreateOrder(order);
