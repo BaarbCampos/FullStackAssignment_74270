@@ -1,0 +1,57 @@
+﻿@page "/cart"
+
+@using SportsStore.CustomerPortal.Services
+@using SportsStore.CustomerPortal.Models
+
+@inject CartService CartService
+
+<h3>Your Cart</h3>
+
+@if (!CartService.GetItems().Any())
+{
+    <p>Cart is empty</p>
+}
+else
+{
+    <table>
+        <thead>
+            <tr>
+                <th>Product</th>
+                <th>Qty</th>
+                <th>Price</th>
+                <th>Total</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in CartService.GetItems())
+            {
+                <tr>
+                    <td>@item.ProductName</td>
+                    <td>@item.Quantity</td>
+                    <td>€@item.Price</td>
+                    <td>€@(item.Price* item.Quantity)</td>
+                    <td>
+                        <button @onclick="() => Remove(item.ProductId)">Remove</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <h4>Total: €@CartService.GetTotal()</h4>
+
+    <button @onclick="ClearCart">Clear Cart</button>
+}
+
+@code {
+    void Remove(int id)
+    {
+        CartService.Remove(id);
+    }
+
+    void ClearCart()
+    {
+        CartService.Clear();
+    }
+}

@@ -1,6 +1,7 @@
 ﻿using Microsoft.Data.Sqlite;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using SportsStore.InventoryService.Configuration;
 using SportsStore.Shared.Contracts;
 using System.Text;
 using System.Text.Json;
@@ -9,20 +10,26 @@ namespace SportsStore.InventoryService;
 
 public class Worker : BackgroundService
 {
+    private readonly RabbitMqSettings _settings;
+
+    public Worker(RabbitMqSettings settings)
+    {
+        _settings = settings;
+    }
+
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var factory = new ConnectionFactory()
         {
-            HostName = "localhost",
-            UserName = "guest",
-            Password = "guest",
-            Port = 5672
+            HostName = _settings.HostName,
+            UserName = _settings.UserName,
+            Password = _settings.Password,
+            Port = _settings.Port
         };
 
         var connection = factory.CreateConnection();
         var channel = connection.CreateModel();
 
-        // Filas
         channel.QueueDeclare("order-submitted", false, false, false);
         channel.QueueDeclare("inventory-confirmed", false, false, false);
         channel.QueueDeclare("inventory-failed", false, false, false);
@@ -35,9 +42,6 @@ public class Worker : BackgroundService
             var order = JsonSerializer.Deserialize<OrderSubmitted>(json);
 
             if (order == null) return;
-
-            Console.WriteLine("📦 Order received:");
-            Console.WriteLine(json);
 
             var connectionString = "Data Source=../SportsStore.OrderApi/orders.db";
 
@@ -66,7 +70,6 @@ public class Worker : BackgroundService
                 }
             }
 
-            // ❌ SEM STOCK
             if (!hasStock)
             {
                 var failed = new InventoryFailed
@@ -79,12 +82,9 @@ public class Worker : BackgroundService
                 var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(failed));
 
                 channel.BasicPublish("", "inventory-failed", null, body);
-
-                Console.WriteLine("❌ Inventory failed!");
                 return;
             }
 
-            // ✅ TEM STOCK → Atualiza BD
             foreach (var item in order.Items)
             {
                 var update = db.CreateCommand();
@@ -109,8 +109,6 @@ public class Worker : BackgroundService
             var confirmedBody = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(confirmed));
 
             channel.BasicPublish("", "inventory-confirmed", null, confirmedBody);
-
-            Console.WriteLine("✅ Inventory confirmed!");
         };
 
         channel.BasicConsume("order-submitted", true, consumer);

@@ -1,6 +1,7 @@
 ﻿using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using SportsStore.Shared.Contracts;
+using SportsStore.ShippingService.Configuration;
 using System.Text;
 using System.Text.Json;
 
@@ -8,14 +9,21 @@ namespace SportsStore.ShippingService;
 
 public class Worker : BackgroundService
 {
+    private readonly RabbitMqSettings _settings;
+
+    public Worker(RabbitMqSettings settings)
+    {
+        _settings = settings;
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var factory = new ConnectionFactory()
         {
-            HostName = "localhost",
-            UserName = "guest",
-            Password = "guest",
-            Port = 5672
+            HostName = _settings.HostName,
+            UserName = _settings.UserName,
+            Password = _settings.Password,
+            Port = _settings.Port
         };
 
         var connection = factory.CreateConnection();
@@ -44,9 +52,6 @@ public class Worker : BackgroundService
             var body = ea.Body.ToArray();
             var json = Encoding.UTF8.GetString(body);
 
-            Console.WriteLine("🚚 Shipping request received:");
-            Console.WriteLine(json);
-
             var shippingRequested = JsonSerializer.Deserialize<ShippingRequested>(json);
 
             if (shippingRequested is null)
@@ -72,9 +77,6 @@ public class Worker : BackgroundService
                 basicProperties: null,
                 body: createdBody
             );
-
-            Console.WriteLine("✅ Shipping created event published:");
-            Console.WriteLine(createdJson);
         };
 
         channel.BasicConsume(

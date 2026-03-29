@@ -1,0 +1,54 @@
+﻿@page "/products"
+
+@using SportsStore.CustomerPortal.Services
+@using SportsStore.CustomerPortal.Models
+
+@inject HttpClient Http
+@inject CartService CartService
+
+<h3>Products</h3>
+
+@if (products == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <ul>
+        @foreach (var p in products)
+        {
+            <li>
+                <b>@p.Name</b> - €@p.Price (Stock: @p.StockQuantity)
+                <button @onclick="() => AddToCart(p)">Add</button>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    List<Product>? products;
+
+    protected override async Task OnInitializedAsync()
+    {
+        products = await Http.GetFromJsonAsync<List<Product>>("api/products");
+    }
+
+    void AddToCart(Product p)
+    {
+        CartService.AddToCart(new CartItem
+        {
+            ProductId = p.Id,
+            ProductName = p.Name,
+            Price = p.Price,
+            Quantity = 1
+        });
+    }
+
+    class Product
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public decimal Price { get; set; }
+        public int StockQuantity { get; set; }
+    }
+}
