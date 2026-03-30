@@ -1,0 +1,6 @@
+@SportsStore.AdminDashboard.Server_HostAddress = http://localhost:5286
+
+GET {{SportsStore.AdminDashboard.Server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
