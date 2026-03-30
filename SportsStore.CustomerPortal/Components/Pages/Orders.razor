@@ -1,0 +1,97 @@
+﻿@page "/orders"
+@rendermode InteractiveServer
+
+@using System.Net.Http.Json
+
+@inject HttpClient Http
+
+<h3>My Orders</h3>
+
+@if (orders == null)
+{
+    <p>Loading...</p>
+}
+else if (!orders.Any())
+{
+    <p>No orders found.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Order ID</th>
+                <th>Email</th>
+                <th>Status</th>
+                <th>Total</th>
+                <th>Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var o in orders)
+            {
+                <tr>
+                    <td>@o.Id</td>
+                    <td>@o.CustomerEmail</td>
+                    <td>
+                        <span class="@GetStatusClass(o.Status)">
+                            @GetStatusName(o.Status)
+                        </span>
+                    </td>
+                    <td>€@o.TotalAmount</td>
+                    <td>@o.CreatedAtUtc.ToLocalTime()</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Order>? orders;
+
+    protected override async Task OnInitializedAsync()
+    {
+        orders = await Http.GetFromJsonAsync<List<Order>>("api/orders");
+    }
+
+    // 🔥 AQUI você coloca o método
+    string GetStatusName(int status)
+    {
+        return status switch
+        {
+            1 => "Submitted",
+            2 => "Inventory Pending",
+            3 => "Inventory Confirmed",
+            4 => "Inventory Failed",
+            5 => "Payment Pending",
+            6 => "Payment Approved",
+            7 => "Payment Failed",
+            8 => "Shipping Pending",
+            9 => "Shipping Created",
+            10 => "Completed",
+            11 => "Failed",
+            _ => "Unknown"
+        };
+    }
+
+    // 🎨 Cor dos status
+    string GetStatusClass(int status)
+    {
+        return status switch
+        {
+            10 => "badge bg-success",     // Completed
+            11 => "badge bg-danger",      // Failed
+            5 or 8 => "badge bg-warning", // Pending
+            _ => "badge bg-info"
+        };
+    }
+
+    public class Order
+    {
+        public Guid Id { get; set; }
+        public string CustomerEmail { get; set; } = "";
+        public int Status { get; set; }
+        public decimal TotalAmount { get; set; }
+        public DateTime CreatedAtUtc { get; set; }
+    }
+}

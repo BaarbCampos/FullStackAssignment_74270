@@ -1,4 +1,5 @@
 ﻿@page "/products"
+@rendermode InteractiveServer
 
 @using SportsStore.CustomerPortal.Services
 @using SportsStore.CustomerPortal.Models
@@ -19,21 +20,29 @@ else
         {
             <li>
                 <b>@p.Name</b> - €@p.Price (Stock: @p.StockQuantity)
-                <button @onclick="() => AddToCart(p)">Add</button>
+                <button class="btn btn-primary btn-sm ms-2" @onclick="() => AddToCart(p)">Add</button>
             </li>
         }
     </ul>
+
+    @if (!string.IsNullOrWhiteSpace(message))
+    {
+        <div class="alert alert-success mt-3">
+            @message
+        </div>
+    }
 }
 
 @code {
-    List<Product>? products;
+    private List<Product>? products;
+    private string message = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
         products = await Http.GetFromJsonAsync<List<Product>>("api/products");
     }
 
-    void AddToCart(Product p)
+    private void AddToCart(Product p)
     {
         CartService.AddToCart(new CartItem
         {
@@ -42,12 +51,14 @@ else
             Price = p.Price,
             Quantity = 1
         });
+
+        message = $"{p.Name} added to cart!";
     }
 
-    class Product
+    public class Product
     {
         public int Id { get; set; }
-        public string Name { get; set; } = "";
+        public string Name { get; set; } = string.Empty;
         public decimal Price { get; set; }
         public int StockQuantity { get; set; }
     }

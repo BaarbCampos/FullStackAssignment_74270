@@ -1,11 +1,21 @@
 ﻿@page "/cart"
+@rendermode InteractiveServer
 
-@using SportsStore.CustomerPortal.Services
+@using System.Net.Http.Json
 @using SportsStore.CustomerPortal.Models
+@using SportsStore.CustomerPortal.Services
 
 @inject CartService CartService
+@inject HttpClient Http
 
 <h3>Your Cart</h3>
+
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <div class="alert @(isSuccess ? "alert-success" : "alert-warning") mt-3">
+        @message
+    </div>
+}
 
 @if (!CartService.GetItems().Any())
 {
@@ -13,11 +23,11 @@
 }
 else
 {
-    <table>
+    <table class="table">
         <thead>
             <tr>
                 <th>Product</th>
-                <th>Qty</th>
+                <th>Quantity</th>
                 <th>Price</th>
                 <th>Total</th>
                 <th></th>
@@ -32,7 +42,7 @@ else
                     <td>€@item.Price</td>
                     <td>€@(item.Price* item.Quantity)</td>
                     <td>
-                        <button @onclick="() => Remove(item.ProductId)">Remove</button>
+                        <button class="btn btn-danger btn-sm" @onclick="() => Remove(item.ProductId)">Remove</button>
                     </td>
                 </tr>
             }
@@ -41,17 +51,73 @@ else
 
     <h4>Total: €@CartService.GetTotal()</h4>
 
-    <button @onclick="ClearCart">Clear Cart</button>
+    <div class="mb-3 mt-3">
+        <label class="form-label">Customer Email</label>
+        <input class="form-control" @bind="customerEmail" placeholder="Enter your email" />
+    </div>
+
+    <button class="btn btn-success me-2" @onclick="Checkout">Checkout</button>
+    <button class="btn btn-secondary" @onclick="ClearCart">Clear Cart</button>
 }
 
 @code {
-    void Remove(int id)
+    private string customerEmail = string.Empty;
+    private string message = string.Empty;
+    private bool isSuccess = false;
+
+    private void Remove(int productId)
     {
-        CartService.Remove(id);
+        CartService.Remove(productId);
     }
 
-    void ClearCart()
+    private void ClearCart()
     {
         CartService.Clear();
+        message = "Cart cleared.";
+        isSuccess = false;
+    }
+
+    private async Task Checkout()
+    {
+        if (!CartService.GetItems().Any())
+        {
+            message = "Your cart is empty.";
+            isSuccess = false;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(customerEmail))
+        {
+            message = "Please enter your email.";
+            isSuccess = false;
+            return;
+        }
+
+        var request = new CheckoutRequest
+        {
+            CustomerEmail = customerEmail,
+            Items = CartService.GetItems()
+                .Select(item => new CheckoutItem
+                {
+                    ProductId = item.ProductId,
+                    Quantity = item.Quantity
+                })
+                .ToList()
+        };
+
+        var response = await Http.PostAsJsonAsync("api/Orders/checkout", request);
+
+        if (response.IsSuccessStatusCode)
+        {
+            CartService.Clear();
+            customerEmail = string.Empty;
+            message = "Order placed successfully! Your cart has been cleared.";
+            isSuccess = true;
+        }
+        else
+        {
+            message = $"Checkout failed: {response.StatusCode}";
+            isSuccess = false;
+        }
     }
 }
