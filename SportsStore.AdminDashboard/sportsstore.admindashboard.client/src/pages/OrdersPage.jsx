@@ -34,6 +34,7 @@ function getStatusColor(status) {
 function OrdersPage() {
   const [orders, setOrders] = useState([]);
   const [error, setError] = useState("");
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   useEffect(() => {
     fetch("https://localhost:7040/api/orders")
@@ -52,8 +53,20 @@ function OrdersPage() {
       });
   }, []);
 
-  function handleViewDetails(orderId) {
-    alert(`Order details for: ${orderId}`);
+  function handleViewDetails(order) {
+    console.log("Clicked order:", order);
+    setSelectedOrder(order);
+
+    setTimeout(() => {
+      const panel = document.getElementById("order-details-panel");
+      if (panel) {
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 100);
+  }
+
+  function handleCloseDetails() {
+    setSelectedOrder(null);
   }
 
   return (
@@ -113,7 +126,7 @@ function OrdersPage() {
               <td style={tdStyle}>€{order.totalAmount}</td>
               <td style={tdStyle}>
                 <button
-                  onClick={() => handleViewDetails(order.id)}
+                  onClick={() => handleViewDetails(order)}
                   style={buttonStyle}
                 >
                   View Details
@@ -123,6 +136,70 @@ function OrdersPage() {
           ))}
         </tbody>
       </table>
+
+      {selectedOrder && (
+        <div
+          id="order-details-panel"
+          style={{
+            marginTop: "24px",
+            padding: "20px",
+            border: "1px solid #334155",
+            borderRadius: "12px",
+            backgroundColor: "#1e293b",
+            color: "white"
+          }}
+        >
+          <h2 style={{ marginTop: 0, marginBottom: "16px" }}>Order Details</h2>
+
+          <p>
+            <strong>Order ID:</strong> {selectedOrder.id}
+          </p>
+
+          <p>
+            <strong>Email:</strong> {selectedOrder.customerEmail}
+          </p>
+
+          <p>
+            <strong>Status:</strong>{" "}
+            <span
+              style={{
+                backgroundColor: getStatusColor(selectedOrder.status),
+                color:
+                  selectedOrder.status === 5 || selectedOrder.status === 8
+                    ? "black"
+                    : "white",
+                padding: "6px 10px",
+                borderRadius: "12px",
+                fontWeight: "bold",
+                display: "inline-block",
+                marginLeft: "8px"
+              }}
+            >
+              {getStatusName(selectedOrder.status)}
+            </span>
+          </p>
+
+          <p>
+            <strong>Total:</strong> €{selectedOrder.totalAmount}
+          </p>
+
+          <button
+            onClick={handleCloseDetails}
+            style={{
+              marginTop: "10px",
+              backgroundColor: "#dc3545",
+              color: "white",
+              border: "none",
+              padding: "8px 12px",
+              borderRadius: "8px",
+              fontWeight: "bold",
+              cursor: "pointer"
+            }}
+          >
+            Close
+          </button>
+        </div>
+      )}
     </div>
   );
 }
