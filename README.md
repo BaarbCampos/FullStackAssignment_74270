@@ -120,7 +120,6 @@ Run each service individually:
 
 ### 2. Run Frontend
 
-```bash
 npm install
 npm run dev
 
@@ -135,6 +134,7 @@ Implement full CQRS pattern
 Dockerize all services
 Improve UI with component library
 Add authentication
+
 ✅ Conclusion
 
 This project demonstrates a distributed system using microservices and RabbitMQ. Each service is independent and communicates through events, creating a scalable and maintainable architecture similar to real-world systems.
