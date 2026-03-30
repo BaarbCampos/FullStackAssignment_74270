@@ -104,27 +104,27 @@ Display order items (products, quantity, price)
 Design Decisions:
 Used inline details panel instead of routing for stability
 Focused on functionality first, UI improvements later
-▶️ How to Run
-1. Start RabbitMQ
-docker run -d -p 5672:5672 -p 15672:15672 rabbitmq:management
 
-Access:
+## ▶️ How to Run
 
-http://localhost:15672
-guest / guest
-2. Run Backend Services
+### 1. Run Backend Services
 
 Run each service individually:
 
-OrderApi
-InventoryService
-PaymentService
-ShippingService
-3. Run Frontend
+- OrderApi
+- InventoryService
+- PaymentService
+- ShippingService
+
+---
+
+### 2. Run Frontend
+
+```bash
 npm install
 npm run dev
 
-Open:
+Open in browser:
 
 http://localhost:5173
 🚧 Future Improvements
