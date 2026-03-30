@@ -65,7 +65,7 @@ The solution is organized into multiple services, each responsible for a specifi
 
 The system follows this order processing pipeline:
 
-```text
+
 OrderApi
  → OrderSubmitted
 
