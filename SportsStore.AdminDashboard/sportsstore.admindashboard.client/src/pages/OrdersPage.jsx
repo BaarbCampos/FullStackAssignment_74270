@@ -106,7 +106,13 @@ function OrdersPage() {
 
         <tbody>
           {orders.map((order) => (
-            <tr key={order.id}>
+            <tr
+              key={order.id}
+              style={{
+                backgroundColor:
+                  selectedOrder?.id === order.id ? "#1e293b" : "transparent"
+              }}
+            >
               <td style={tdStyle}>{order.id}</td>
               <td style={tdStyle}>{order.customerEmail}</td>
               <td style={tdStyle}>
@@ -136,6 +142,18 @@ function OrdersPage() {
           ))}
         </tbody>
       </table>
+
+      {!selectedOrder && (
+        <p
+          style={{
+            marginTop: "20px",
+            color: "#cbd5e1",
+            fontSize: "16px"
+          }}
+        >
+          Select an order to view details.
+        </p>
+      )}
 
       {selectedOrder && (
         <div
