@@ -25,6 +25,7 @@ else
                 <th>Status</th>
                 <th>Total</th>
                 <th>Date</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
@@ -40,6 +41,9 @@ else
                     </td>
                     <td>€@o.TotalAmount</td>
                     <td>@o.CreatedAtUtc.ToLocalTime()</td>
+                    <td>
+                        <a class="btn btn-sm btn-primary" href="/orders/@o.Id">View</a>
+                    </td>
                 </tr>
             }
         </tbody>
@@ -54,7 +58,6 @@ else
         orders = await Http.GetFromJsonAsync<List<Order>>("api/orders");
     }
 
-    // 🔥 AQUI você coloca o método
     string GetStatusName(int status)
     {
         return status switch
@@ -74,14 +77,13 @@ else
         };
     }
 
-    // 🎨 Cor dos status
     string GetStatusClass(int status)
     {
         return status switch
         {
-            10 => "badge bg-success",     // Completed
-            11 => "badge bg-danger",      // Failed
-            5 or 8 => "badge bg-warning", // Pending
+            10 => "badge bg-success",
+            11 => "badge bg-danger",
+            5 or 8 => "badge bg-warning",
             _ => "badge bg-info"
         };
     }

@@ -1,0 +1,118 @@
+﻿@page "/orders/{Id:guid}"
+@rendermode InteractiveServer
+
+@using System.Net.Http.Json
+
+@inject HttpClient Http
+
+<h3>Order Details</h3>
+
+@if (order == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <div class="card p-3 mb-4">
+        <p><strong>Order ID:</strong> @order.Id</p>
+        <p><strong>Email:</strong> @order.CustomerEmail</p>
+        <p>
+            <strong>Status:</strong>
+            <span class="@GetStatusClass(order.Status)">
+                @GetStatusName(order.Status)
+            </span>
+        </p>
+        <p><strong>Total:</strong> €@order.TotalAmount</p>
+        <p><strong>Date:</strong> @order.CreatedAtUtc.ToLocalTime()</p>
+    </div>
+
+    <h4>Items</h4>
+
+    @if (order.Items == null || !order.Items.Any())
+    {
+        <p>No items found for this order.</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Quantity</th>
+                    <th>Unit Price</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in order.Items)
+                {
+                    <tr>
+                        <td>@item.ProductName</td>
+                        <td>@item.Quantity</td>
+                        <td>€@item.UnitPrice</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private OrderDetailsDto? order;
+
+    protected override async Task OnInitializedAsync()
+    {
+        order = await Http.GetFromJsonAsync<OrderDetailsDto>($"api/orders/{Id}");
+    }
+
+    string GetStatusName(int status)
+    {
+        return status switch
+        {
+            1 => "Submitted",
+            2 => "Inventory Pending",
+            3 => "Inventory Confirmed",
+            4 => "Inventory Failed",
+            5 => "Payment Pending",
+            6 => "Payment Approved",
+            7 => "Payment Failed",
+            8 => "Shipping Pending",
+            9 => "Shipping Created",
+            10 => "Completed",
+            11 => "Failed",
+            _ => "Unknown"
+        };
+    }
+
+    string GetStatusClass(int status)
+    {
+        return status switch
+        {
+            10 => "badge bg-success",
+            11 => "badge bg-danger",
+            5 or 8 => "badge bg-warning",
+            _ => "badge bg-info"
+        };
+    }
+
+    public class OrderDetailsDto
+    {
+        public Guid Id { get; set; }
+        public string CustomerEmail { get; set; } = "";
+        public int Status { get; set; }
+        public decimal TotalAmount { get; set; }
+        public DateTime CreatedAtUtc { get; set; }
+        public List<OrderItemDto> Items { get; set; } = new();
+    }
+
+    public class OrderItemDto
+    {
+        public int Id { get; set; }
+        public int ProductId { get; set; }
+        public string ProductName { get; set; } = "";
+        public int Quantity { get; set; }
+        public decimal UnitPrice { get; set; }
+    }
+}
