@@ -26,6 +26,20 @@ builder.Services.AddHostedService<PaymentApprovedConsumer>();
 builder.Services.AddHostedService<PaymentRejectedConsumer>();
 builder.Services.AddHostedService<ShippingCreatedConsumer>();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("FrontendPolicy", policy =>
+    {
+        policy.WithOrigins(
+                "http://localhost:5173",   // React Admin Dashboard
+                "https://localhost:7134",  // Blazor CustomerPortal (ajusta se precisar)
+                "http://localhost:5125"    // se teu CustomerPortal ou outro frontend usar HTTP
+              )
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -35,5 +49,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseCors("FrontendPolicy");
+
 app.MapControllers();
+
 app.Run();
