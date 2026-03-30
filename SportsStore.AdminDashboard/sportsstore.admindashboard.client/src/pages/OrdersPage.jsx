@@ -31,6 +31,24 @@ function getStatusColor(status) {
   }
 }
 
+function getItemName(item) {
+  return (
+    item.productName ||
+    item.name ||
+    item.product?.name ||
+    item.productTitle ||
+    "Unknown product"
+  );
+}
+
+function getItemQuantity(item) {
+  return item.quantity ?? item.qty ?? 0;
+}
+
+function getItemPrice(item) {
+  return item.price ?? item.unitPrice ?? item.product?.price ?? 0;
+}
+
 function OrdersPage() {
   const [orders, setOrders] = useState([]);
   const [error, setError] = useState("");
@@ -201,10 +219,43 @@ function OrdersPage() {
             <strong>Total:</strong> €{selectedOrder.totalAmount}
           </p>
 
+          <div style={{ marginTop: "24px" }}>
+            <h3 style={{ marginBottom: "12px" }}>Order Items</h3>
+
+            {selectedOrder.items && selectedOrder.items.length > 0 ? (
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  marginTop: "10px"
+                }}
+              >
+                <thead>
+                  <tr style={{ backgroundColor: "#0f172a" }}>
+                    <th style={thStyle}>Product</th>
+                    <th style={thStyle}>Quantity</th>
+                    <th style={thStyle}>Price</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedOrder.items.map((item, index) => (
+                    <tr key={index}>
+                      <td style={tdStyle}>{getItemName(item)}</td>
+                      <td style={tdStyle}>{getItemQuantity(item)}</td>
+                      <td style={tdStyle}>€{getItemPrice(item)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p style={{ color: "#cbd5e1" }}>No items found for this order.</p>
+            )}
+          </div>
+
           <button
             onClick={handleCloseDetails}
             style={{
-              marginTop: "10px",
+              marginTop: "20px",
               backgroundColor: "#dc3545",
               color: "white",
               border: "none",
