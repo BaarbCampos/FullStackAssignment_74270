@@ -52,6 +52,10 @@ function OrdersPage() {
       });
   }, []);
 
+  function handleViewDetails(orderId) {
+    alert(`Order details for: ${orderId}`);
+  }
+
   return (
     <div
       style={{
@@ -83,6 +87,7 @@ function OrdersPage() {
             <th style={thStyle}>Email</th>
             <th style={thStyle}>Status</th>
             <th style={thStyle}>Total</th>
+            <th style={thStyle}>Actions</th>
           </tr>
         </thead>
 
@@ -106,6 +111,14 @@ function OrdersPage() {
                 </span>
               </td>
               <td style={tdStyle}>€{order.totalAmount}</td>
+              <td style={tdStyle}>
+                <button
+                  onClick={() => handleViewDetails(order.id)}
+                  style={buttonStyle}
+                >
+                  View Details
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -123,6 +136,16 @@ const thStyle = {
 const tdStyle = {
   border: "1px solid #444",
   padding: "12px"
+};
+
+const buttonStyle = {
+  backgroundColor: "#0dcaf0",
+  color: "#000",
+  border: "none",
+  padding: "8px 12px",
+  borderRadius: "8px",
+  fontWeight: "bold",
+  cursor: "pointer"
 };
 
 export default OrdersPage;

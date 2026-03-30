@@ -3,18 +3,30 @@ import { Link, useParams } from "react-router-dom";
 
 function getStatusName(status) {
   switch (status) {
-    case 1: return "Submitted";
-    case 2: return "Inventory Pending";
-    case 3: return "Inventory Confirmed";
-    case 4: return "Inventory Failed";
-    case 5: return "Payment Pending";
-    case 6: return "Payment Approved";
-    case 7: return "Payment Failed";
-    case 8: return "Shipping Pending";
-    case 9: return "Shipping Created";
-    case 10: return "Completed";
-    case 11: return "Failed";
-    default: return "Unknown";
+    case 1:
+      return "Submitted";
+    case 2:
+      return "Inventory Pending";
+    case 3:
+      return "Inventory Confirmed";
+    case 4:
+      return "Inventory Failed";
+    case 5:
+      return "Payment Pending";
+    case 6:
+      return "Payment Approved";
+    case 7:
+      return "Payment Failed";
+    case 8:
+      return "Shipping Pending";
+    case 9:
+      return "Shipping Created";
+    case 10:
+      return "Completed";
+    case 11:
+      return "Failed";
+    default:
+      return "Unknown";
   }
 }
 
@@ -69,7 +81,7 @@ function OrderDetailsPage() {
   if (error) {
     return (
       <div style={pageStyle}>
-        <p style={{ color: "red", fontWeight: "bold" }}>{error}</p>
+        <p style={errorStyle}>{error}</p>
         <Link to="/" style={linkStyle}>
           ← Back to Orders
         </Link>
@@ -94,9 +106,7 @@ function OrderDetailsPage() {
         ← Back to Orders
       </Link>
 
-      <h1 style={{ marginTop: "20px", marginBottom: "20px" }}>
-        Order #{order.id}
-      </h1>
+      <h1 style={detailsTitleStyle}>Order #{order.id}</h1>
 
       <div style={cardStyle}>
         <p>
@@ -118,22 +128,28 @@ function OrderDetailsPage() {
           </span>
         </p>
 
-        <p><strong>Email:</strong> {order.customerEmail}</p>
-        <p><strong>Total:</strong> €{order.totalAmount}</p>
+        <p>
+          <strong>Email:</strong> {order.customerEmail}
+        </p>
+
+        <p>
+          <strong>Total:</strong> €{order.totalAmount}
+        </p>
       </div>
 
-      <h2 style={{ marginBottom: "15px" }}>Order Items</h2>
+      <h2 style={sectionTitleStyle}>Order Items</h2>
 
       {order.items && order.items.length > 0 ? (
         <table style={tableStyle}>
           <thead>
-            <tr style={{ backgroundColor: "#1f1f1f" }}>
+            <tr style={headerRowStyle}>
               <th style={thStyle}>Product</th>
               <th style={thStyle}>Quantity</th>
               <th style={thStyle}>Unit Price</th>
               <th style={thStyle}>Subtotal</th>
             </tr>
           </thead>
+
           <tbody>
             {order.items.map((item, index) => (
               <tr key={index}>
@@ -160,10 +176,28 @@ const pageStyle = {
   backgroundColor: "#0f172a"
 };
 
+const detailsTitleStyle = {
+  marginTop: "20px",
+  marginBottom: "20px"
+};
+
+const sectionTitleStyle = {
+  marginBottom: "15px"
+};
+
+const errorStyle = {
+  color: "red",
+  fontWeight: "bold"
+};
+
 const tableStyle = {
   width: "100%",
   borderCollapse: "collapse",
   marginTop: "10px"
+};
+
+const headerRowStyle = {
+  backgroundColor: "#1f1f1f"
 };
 
 const thStyle = {
