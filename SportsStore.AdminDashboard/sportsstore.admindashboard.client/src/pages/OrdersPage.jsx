@@ -53,6 +53,7 @@ function OrdersPage() {
   const [orders, setOrders] = useState([]);
   const [error, setError] = useState("");
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("All");
 
   useEffect(() => {
     fetch("https://localhost:7040/api/orders")
@@ -87,6 +88,11 @@ function OrdersPage() {
     setSelectedOrder(null);
   }
 
+  const filteredOrders =
+    statusFilter === "All"
+      ? orders
+      : orders.filter((order) => getStatusName(order.status) === statusFilter);
+
   return (
     <div
       style={{
@@ -104,6 +110,51 @@ function OrdersPage() {
           {error}
         </p>
       )}
+
+      <div
+        style={{
+          marginTop: "20px",
+          marginBottom: "20px",
+          display: "flex",
+          alignItems: "center",
+          gap: "12px"
+        }}
+      >
+        <label htmlFor="statusFilter" style={{ fontWeight: "bold" }}>
+          Filter by status:
+        </label>
+
+        <select
+          id="statusFilter"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          style={{
+            padding: "8px 12px",
+            borderRadius: "8px",
+            border: "1px solid #334155",
+            backgroundColor: "#1e293b",
+            color: "white",
+            fontWeight: "bold"
+          }}
+        >
+          <option value="All">All</option>
+          <option value="Submitted">Submitted</option>
+          <option value="Inventory Pending">Inventory Pending</option>
+          <option value="Inventory Confirmed">Inventory Confirmed</option>
+          <option value="Inventory Failed">Inventory Failed</option>
+          <option value="Payment Pending">Payment Pending</option>
+          <option value="Payment Approved">Payment Approved</option>
+          <option value="Payment Failed">Payment Failed</option>
+          <option value="Shipping Pending">Shipping Pending</option>
+          <option value="Shipping Created">Shipping Created</option>
+          <option value="Completed">Completed</option>
+          <option value="Failed">Failed</option>
+        </select>
+
+        <span style={{ color: "#cbd5e1" }}>
+          Showing {filteredOrders.length} order(s)
+        </span>
+      </div>
 
       <table
         style={{
@@ -123,41 +174,49 @@ function OrdersPage() {
         </thead>
 
         <tbody>
-          {orders.map((order) => (
-            <tr
-              key={order.id}
-              style={{
-                backgroundColor:
-                  selectedOrder?.id === order.id ? "#1e293b" : "transparent"
-              }}
-            >
-              <td style={tdStyle}>{order.id}</td>
-              <td style={tdStyle}>{order.customerEmail}</td>
-              <td style={tdStyle}>
-                <span
-                  style={{
-                    backgroundColor: getStatusColor(order.status),
-                    color: order.status === 5 || order.status === 8 ? "black" : "white",
-                    padding: "6px 10px",
-                    borderRadius: "12px",
-                    fontWeight: "bold",
-                    display: "inline-block"
-                  }}
-                >
-                  {getStatusName(order.status)}
-                </span>
-              </td>
-              <td style={tdStyle}>€{order.totalAmount}</td>
-              <td style={tdStyle}>
-                <button
-                  onClick={() => handleViewDetails(order)}
-                  style={buttonStyle}
-                >
-                  View Details
-                </button>
+          {filteredOrders.length > 0 ? (
+            filteredOrders.map((order) => (
+              <tr
+                key={order.id}
+                style={{
+                  backgroundColor:
+                    selectedOrder?.id === order.id ? "#1e293b" : "transparent"
+                }}
+              >
+                <td style={tdStyle}>{order.id}</td>
+                <td style={tdStyle}>{order.customerEmail}</td>
+                <td style={tdStyle}>
+                  <span
+                    style={{
+                      backgroundColor: getStatusColor(order.status),
+                      color: order.status === 5 || order.status === 8 ? "black" : "white",
+                      padding: "6px 10px",
+                      borderRadius: "12px",
+                      fontWeight: "bold",
+                      display: "inline-block"
+                    }}
+                  >
+                    {getStatusName(order.status)}
+                  </span>
+                </td>
+                <td style={tdStyle}>€{order.totalAmount}</td>
+                <td style={tdStyle}>
+                  <button
+                    onClick={() => handleViewDetails(order)}
+                    style={buttonStyle}
+                  >
+                    View Details
+                  </button>
+                </td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td style={tdStyle} colSpan="5">
+                No orders found for this status.
               </td>
             </tr>
-          ))}
+          )}
         </tbody>
       </table>
 
