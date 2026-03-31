@@ -40,15 +40,21 @@ public class OrdersController : ControllerBase
     {
         _logger.LogInformation("Checkout started for customer {CustomerEmail}", request?.CustomerEmail);
 
-        if (request == null || request.Items == null || !request.Items.Any())
+        if (request == null)
         {
-            _logger.LogWarning("Checkout failed because the request had no items.");
+            _logger.LogWarning("Checkout validation failed: request body is null.");
+            return BadRequest("Request body is required.");
+        }
+
+        if (request.Items == null || !request.Items.Any())
+        {
+            _logger.LogWarning("Checkout validation failed for customer {CustomerEmail}: no items provided.", request.CustomerEmail);
             return BadRequest("The order must contain at least one item.");
         }
 
         if (string.IsNullOrWhiteSpace(request.CustomerEmail))
         {
-            _logger.LogWarning("Checkout failed because customer email was missing.");
+            _logger.LogWarning("Checkout validation failed: customer email is missing.");
             return BadRequest("Customer email is required.");
         }
 
@@ -57,7 +63,7 @@ public class OrdersController : ControllerBase
             .Distinct()
             .ToList();
 
-        _logger.LogInformation("Looking up {Count} requested products.", requestedProductIds.Count);
+        _logger.LogInformation("Looking up {ProductCount} requested products for checkout.", requestedProductIds.Count);
 
         var products = await _context.Products
             .Where(p => requestedProductIds.Contains(p.Id))
@@ -65,7 +71,9 @@ public class OrdersController : ControllerBase
 
         if (products.Count != requestedProductIds.Count)
         {
-            _logger.LogWarning("Checkout failed because one or more products do not exist.");
+            _logger.LogWarning(
+                "Checkout validation failed for customer {CustomerEmail}: one or more products do not exist.",
+                request.CustomerEmail);
             return BadRequest("One or more selected products do not exist.");
         }
 
@@ -75,8 +83,11 @@ public class OrdersController : ControllerBase
         {
             if (item.Quantity <= 0)
             {
-                _logger.LogWarning("Checkout failed because product {ProductId} had invalid quantity {Quantity}.",
-                    item.ProductId, item.Quantity);
+                _logger.LogWarning(
+                    "Checkout validation failed for customer {CustomerEmail}: invalid quantity {Quantity} for product {ProductId}.",
+                    request.CustomerEmail,
+                    item.Quantity,
+                    item.ProductId);
                 return BadRequest("Quantity must be greater than zero.");
             }
 
@@ -99,10 +110,14 @@ public class OrdersController : ControllerBase
         order.CreatedAtUtc = DateTime.UtcNow;
         order.Items = orderItems;
 
-        _logger.LogInformation("Creating order {OrderId} for customer {CustomerEmail} with total {TotalAmount}.",
-            order.Id, order.CustomerEmail, order.TotalAmount);
-
         _orderService.CreateOrder(order);
+
+        _logger.LogInformation(
+            "Order {OrderId} created for customer {CustomerEmail} with total {TotalAmount} and {ItemCount} item(s).",
+            order.Id,
+            order.CustomerEmail,
+            order.TotalAmount,
+            order.Items.Count);
 
         var orderSubmitted = new OrderSubmitted
         {
@@ -119,17 +134,15 @@ public class OrdersController : ControllerBase
             }).ToList()
         };
 
-        _logger.LogInformation("Publishing OrderSubmitted event for order {OrderId}.", order.Id);
-
         await _messagePublisher.PublishAsync("order-submitted", orderSubmitted);
+
+        _logger.LogInformation("OrderSubmitted event published for order {OrderId}.", order.Id);
 
         _orderService.UpdateOrderStatus(order.Id, (int)OrderStatus.InventoryPending);
 
-        _logger.LogInformation("Order {OrderId} status updated to {Status}.",
-            order.Id, OrderStatus.InventoryPending);
+        _logger.LogInformation("Order {OrderId} status updated to {Status}.", order.Id, OrderStatus.InventoryPending);
 
         var response = _mapper.Map<CheckoutResponseDto>(order);
-        response.OrderId = order.Id;
         response.Status = OrderStatus.InventoryPending;
         response.TotalAmount = order.TotalAmount;
         response.Message = "Order submitted successfully and is waiting for inventory confirmation.";
