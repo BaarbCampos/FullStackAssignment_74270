@@ -1,6 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Serilog;
-using SportsStore.OrderApi.Configuration;
 using SportsStore.OrderApi.Data;
 using SportsStore.OrderApi.Messaging;
 using SportsStore.OrderApi.Services;
@@ -9,8 +8,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Serilog
 Log.Logger = new LoggerConfiguration()
-    .ReadFrom.Configuration(builder.Configuration)
-    .Enrich.FromLogContext()
     .WriteTo.Console()
     .CreateLogger();
 
@@ -28,10 +25,7 @@ builder.Services.AddDbContext<OrderDbContext>(options =>
 // AutoMapper
 builder.Services.AddAutoMapper(typeof(Program));
 
-// Configuration
-builder.Services.Configure<RabbitMqSettings>(builder.Configuration.GetSection("RabbitMq"));
-
-// App services
+// Application services
 builder.Services.AddScoped<IOrderService, EfOrderService>();
 builder.Services.AddScoped<IMessagePublisher, RabbitMqMessagePublisher>();
 
@@ -44,7 +38,6 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseSerilogRequestLogging();
 app.UseHttpsRedirection();
 
 app.UseAuthorization();
