@@ -1,148 +1,140 @@
-# SportsStore - Assignment 2
+# 🚀 SportsStore - Assignment 2
 
-## Project Overview
+## 📌 Project Overview
 
-SportsStore is a distributed e-commerce order processing system built using .NET microservices and RabbitMQ for asynchronous communication.
+SportsStore is a distributed e-commerce order processing system built using .NET microservices and RabbitMQ for asynchronous communication, combined with a React Admin Dashboard for order management.
 
-The project simulates the lifecycle of a customer order from checkout to completion.  
-Instead of processing everything inside a single application, the system uses separate services that communicate through events.
+The system simulates the full lifecycle of a customer order, from checkout to completion. Instead of processing everything in a single application, the system is divided into multiple independent services that communicate through events.
 
-The current implementation includes:
-
-- Order API
-- Inventory Service
-- Payment Service
-- Shipping Service
-- Shared contracts library
-- RabbitMQ integration
-- Asynchronous event-driven workflow
-
-The main goal of this project is to demonstrate a microservices architecture with decoupled services, message-based communication, and status tracking throughout the order lifecycle.
+This project demonstrates how modern distributed systems handle workflows using event-driven architecture, decoupled services, and message-based communication.
 
 ---
 
-## Architecture
+## 🧩 Technologies Used
 
-The solution is organized into multiple projects, each with a specific responsibility.
+### 🔹 Backend
+- .NET (ASP.NET Core Web API)
+- C#
+- RabbitMQ
+- Microservices Architecture
 
-### Solution Structure
+### 🔹 Frontend
+- React (Vite)
+- JavaScript
+- CSS (Custom Styling)
 
-- `SportsStore.OrderApi`  
-  Handles order creation, exposes API endpoints, publishes the initial event, and updates the final order status.
-
-- `SportsStore.InventoryService`  
-  Consumes order submission events and publishes inventory confirmation events.
-
-- `SportsStore.PaymentService`  
-  Consumes inventory confirmation events and publishes payment approval events.
-
-- `SportsStore.ShippingService`  
-  Consumes payment approval events and publishes shipping creation events.
-
-- `SportsStore.Shared`  
-  Contains shared DTOs, enums, and event contracts used across the services.
-
-- `SportsStore`  
-  Legacy/original project from the previous assignment phase.
-
-- `SportsStore.Tests`  
-  Placeholder for tests and future validation.
-
-### Architectural Style
-
-This project follows an **event-driven microservices architecture**.
-
-Each service is isolated and communicates asynchronously through RabbitMQ queues.  
-This improves separation of concerns and simulates how real distributed systems handle workflows across multiple components.
+### 🔹 Concepts
+- Event-driven architecture
+- Asynchronous communication
+- Distributed systems
+- CQRS (conceptual)
+- Separation of concerns
 
 ---
 
-## Services
+## 🏗️ Architecture
 
-### 1. SportsStore.OrderApi
-Responsibilities:
-- Exposes REST endpoints for order operations
-- Accepts checkout requests
-- Creates orders
-- Publishes the `OrderSubmitted` event
-- Consumes the final `ShippingCreated` event
-- Updates the order status to `Completed`
+The solution is organized into multiple services, each responsible for a specific part of the order lifecycle.
 
-Main endpoints:
-- `POST /api/orders/checkout`
-- `GET /api/orders/{id}`
+### 📦 Solution Structure
 
----
+- **SportsStore.OrderApi**  
+  Handles order creation, exposes API endpoints, publishes events, and updates order status.
 
-### 2. SportsStore.InventoryService
-Responsibilities:
-- Consumes `OrderSubmitted`
-- Simulates inventory validation
-- Publishes `InventoryConfirmed`
+- **SportsStore.InventoryService**  
+  Consumes order events and validates inventory.
 
----
+- **SportsStore.PaymentService**  
+  Processes payments.
 
-### 3. SportsStore.PaymentService
-Responsibilities:
-- Consumes `InventoryConfirmed`
-- Simulates payment processing
-- Publishes `PaymentApproved`
+- **SportsStore.ShippingService**  
+  Creates shipment after payment.
+
+- **SportsStore.Shared**  
+  Shared DTOs, enums, and event contracts.
+
+- **SportsStore**  
+  Legacy project from Assignment 1.
+
+- **SportsStore.Tests**  
+  Placeholder for future testing.
 
 ---
 
-### 4. SportsStore.ShippingService
-Responsibilities:
-- Consumes `PaymentApproved`
-- Simulates shipment creation
-- Publishes `ShippingCreated`
+## 🔄 Event Flow
 
----
+The system follows this order processing pipeline:
 
-### 5. SportsStore.Shared
-Responsibilities:
-- Shared event contracts
-- Shared DTOs
-- Shared order status enum
 
-Examples:
-- `OrderSubmitted`
-- `InventoryConfirmed`
-- `PaymentApproved`
-- `ShippingCreated`
-- `OrderStatus`
-
----
-
-## Event Flow
-
-The system currently supports the successful order workflow below:
-
-1. Customer sends a checkout request to the Order API
-2. Order API creates an order with status `Submitted`
-3. Order API publishes `OrderSubmitted`
-4. Inventory Service consumes `OrderSubmitted`
-5. Inventory Service publishes `InventoryConfirmed`
-6. Payment Service consumes `InventoryConfirmed`
-7. Payment Service publishes `PaymentApproved`
-8. Shipping Service consumes `PaymentApproved`
-9. Shipping Service publishes `ShippingCreated`
-10. Order API consumes `ShippingCreated`
-11. Order API updates the order status to `Completed`
-
-### Event Pipeline
-
-```text
 OrderApi
- -> order-submitted
+ → OrderSubmitted
 
 InventoryService
- -> inventory-confirmed
+ → InventoryConfirmed
 
 PaymentService
- -> payment-approved
+ → PaymentApproved
 
 ShippingService
- -> shipping-created
+ → ShippingCreated
 
 OrderApi
- -> order status updated to Completed
+ → Order status updated to Completed
+Step-by-step:
+Customer sends checkout request
+Order is created (Submitted)
+Inventory is validated
+Payment is processed
+Shipping is created
+Order is marked as Completed
+🖥️ Frontend (Admin Dashboard)
+
+The project includes a React Admin Dashboard for managing orders.
+
+Features:
+View list of orders
+Display:
+Order ID
+Email
+Status (with color indicators)
+Total amount
+Filter orders by status
+View order details inline
+Display order items (products, quantity, price)
+Design Decisions:
+Used inline details panel instead of routing for stability
+Focused on functionality first, UI improvements later
+
+## ▶️ How to Run
+
+### 1. Run Backend Services
+
+Run each service individually:
+
+- OrderApi
+- InventoryService
+- PaymentService
+- ShippingService
+
+---
+
+### 2. Run Frontend
+
+npm install
+npm run dev
+
+Open in browser:
+
+http://localhost:5173
+🚧 Future Improvements
+Add error handling (failures in services)
+Implement logging (Serilog)
+Add AutoMapper
+Implement full CQRS pattern
+Dockerize all services
+Improve UI with component library
+Add authentication
+
+✅ Conclusion
+
+This project demonstrates a distributed system using microservices and RabbitMQ. Each service is independent and communicates through events, creating a scalable and maintainable architecture similar to real-world systems.
