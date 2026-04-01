@@ -50,7 +50,9 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(
                 "http://localhost:5173",   // React Admin Dashboard
                 "https://localhost:7134",  // Blazor CustomerPortal
-                "http://localhost:5125"    // optional HTTP frontend
+                "http://localhost:5125",   // optional HTTP frontend
+                "https://localhost:7062",  // AdminDashboard HTTPS
+                "http://localhost:5286"    // AdminDashboard HTTP
               )
               .AllowAnyHeader()
               .AllowAnyMethod();

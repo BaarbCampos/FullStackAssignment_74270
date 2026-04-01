@@ -8,7 +8,7 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddScoped(sp => new HttpClient
 {
-    BaseAddress = new Uri("https://localhost:7040/")
+    BaseAddress = new Uri("http://localhost:5211/")
 });
 
 builder.Services.AddSingleton<CartService>();
