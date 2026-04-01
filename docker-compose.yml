@@ -1,0 +1,44 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    hostname: rabbitmq
+    container_name: sportsstore-rabbitmq-assignment
+    environment:
+      RABBITMQ_DEFAULT_USER: sportsstore
+      RABBITMQ_DEFAULT_PASS: sports123
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  orderapi:
+    build:
+      context: .
+      dockerfile: SportsStore.OrderApi/Dockerfile
+    container_name: sportsstore-orderapi
+    depends_on:
+      - rabbitmq
+    ports:
+      - "7040:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: Data Source=/data/orders.db
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__UserName: sportsstore
+      RabbitMq__Password: sports123
+    volumes:
+      - orders-data:/data
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until nc -z rabbitmq 5672; do
+          echo "Waiting for RabbitMQ..."
+          sleep 2
+        done
+        echo "RabbitMQ is up"
+        exec dotnet SportsStore.OrderApi.dll
+
+volumes:
+  orders-data:

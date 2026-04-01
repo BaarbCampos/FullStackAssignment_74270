@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.0.31903.59
+# Visual Studio Version 18
+VisualStudioVersion = 18.4.11626.88 stable
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SportsStore", "SportsStore\SportsStore.csproj", "{6512AD42-1199-457C-A8EF-0F571C58726C}"
 EndProject
@@ -22,6 +22,11 @@ EndProject
 Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "sportsstore.admindashboard.client", "SportsStore.AdminDashboard\sportsstore.admindashboard.client\sportsstore.admindashboard.client.esproj", "{1BD82CD8-6FFD-510A-4D15-41A4060CF123}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SportsStore.AdminDashboard.Server", "SportsStore.AdminDashboard\SportsStore.AdminDashboard.Server\SportsStore.AdminDashboard.Server.csproj", "{892D2FEB-12E4-4101-A89C-B09C3A4596FB}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{98ED42C9-C9FD-4DC7-83A6-F72E23574CFF}"
+	ProjectSection(SolutionItems) = preProject
+		docker-compose.yml = docker-compose.yml
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
