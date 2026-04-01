@@ -22,13 +22,13 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__DefaultConnection: Data Source=/data/orders.db
+      ConnectionStrings__DefaultConnection: Data Source=/app/orders.db
       RabbitMq__HostName: rabbitmq
       RabbitMq__Port: 5672
       RabbitMq__UserName: sportsstore
       RabbitMq__Password: sports123
     volumes:
-      - orders-data:/data
+      - ./SportsStore.OrderApi/orders.db:/app/orders.db
     entrypoint:
       - /bin/sh
       - -c
@@ -39,6 +39,3 @@ services:
         done
         echo "RabbitMQ is up"
         exec dotnet SportsStore.OrderApi.dll
-
-volumes:
-  orders-data:
