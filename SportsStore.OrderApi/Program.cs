@@ -52,7 +52,8 @@ builder.Services.AddCors(options =>
                 "https://localhost:7134",  // Blazor CustomerPortal
                 "http://localhost:5125",   // optional HTTP frontend
                 "https://localhost:7062",  // AdminDashboard HTTPS
-                "http://localhost:5286"    // AdminDashboard HTTP
+                "http://localhost:5286",   // AdminDashboard HTTP
+                "http://localhost:55058"   // Vite client
               )
               .AllowAnyHeader()
               .AllowAnyMethod();
