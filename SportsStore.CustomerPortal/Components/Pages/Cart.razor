@@ -8,56 +8,77 @@
 @inject CartService CartService
 @inject HttpClient Http
 
-<h3>Your Cart</h3>
+<PageTitle>Cart</PageTitle>
+
+<div class="page-header">
+    <h2>Your Cart</h2>
+    <p>Review your selected items before completing your purchase.</p>
+</div>
 
 @if (!string.IsNullOrWhiteSpace(message))
 {
-    <div class="alert @(isSuccess ? "alert-success" : "alert-warning") mt-3">
+    <div class="alert @(isSuccess ? "alert-success" : "alert-warning") mb-4">
         @message
     </div>
 }
 
 @if (!CartService.GetItems().Any())
 {
-    <p>Cart is empty</p>
+    <div class="empty-state">
+        <h4>Your cart is empty</h4>
+        <p class="text-muted">Add some products to continue shopping.</p>
+        <a class="btn btn-primary mt-2" href="/products">Browse Products</a>
+    </div>
 }
 else
 {
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Product</th>
-                <th>Quantity</th>
-                <th>Price</th>
-                <th>Total</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var item in CartService.GetItems())
-            {
-                <tr>
-                    <td>@item.ProductName</td>
-                    <td>@item.Quantity</td>
-                    <td>€@item.Price</td>
-                    <td>€@(item.Price* item.Quantity)</td>
-                    <td>
-                        <button class="btn btn-danger btn-sm" @onclick="() => Remove(item.ProductId)">Remove</button>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
-
-    <h4>Total: €@CartService.GetTotal()</h4>
-
-    <div class="mb-3 mt-3">
-        <label class="form-label">Customer Email</label>
-        <input class="form-control" @bind="customerEmail" placeholder="Enter your email" />
+    <div class="table-card">
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Quantity</th>
+                        <th>Price</th>
+                        <th>Total</th>
+                        <th class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in CartService.GetItems())
+                    {
+                        <tr>
+                            <td>@item.ProductName</td>
+                            <td>@item.Quantity</td>
+                            <td>€@item.Price.ToString("0.00")</td>
+                            <td>€@((item.Price * item.Quantity).ToString("0.00"))</td>
+                            <td class="text-end">
+                                <button class="btn btn-danger btn-sm" @onclick="() => Remove(item.ProductId)">
+                                    Remove
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     </div>
 
-    <button class="btn btn-success me-2" @onclick="Checkout">Checkout</button>
-    <button class="btn btn-secondary" @onclick="ClearCart">Clear Cart</button>
+    <div class="summary-box">
+        <h4 class="mb-3">Order Summary</h4>
+        <h3 class="mb-4">Total: €@CartService.GetTotal().ToString("0.00")</h3>
+
+        <div class="mb-3">
+            <label class="form-label">Customer Email</label>
+            <input class="form-control" @bind="customerEmail" placeholder="Enter your email" />
+        </div>
+
+        <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-success" @onclick="Checkout">Checkout</button>
+            <button class="btn btn-secondary" @onclick="ClearCart">Clear Cart</button>
+            <a class="btn btn-outline-primary" href="/products">Continue Shopping</a>
+        </div>
+    </div>
 }
 
 @code {

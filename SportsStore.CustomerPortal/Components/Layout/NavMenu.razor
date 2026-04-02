@@ -1,29 +1,23 @@
-﻿<div class="top-row ps-3 navbar navbar-dark bg-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand fw-bold" href="">🏀 SportsStore</a>
-    </div>
+﻿<div class="ss-brand">
+    <a class="ss-brand-link" href="/">
+        <span class="ss-brand-icon">🏀</span>
+        <span class="ss-brand-text">SportsStore</span>
+    </a>
 </div>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+<nav class="ss-nav">
+    <NavLink class="ss-nav-link" href="/orders">
+        <span class="ss-nav-icon">📦</span>
+        <span>Orders</span>
+    </NavLink>
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column p-2">
+    <NavLink class="ss-nav-link" href="/products">
+        <span class="ss-nav-icon">🛍️</span>
+        <span>Products</span>
+    </NavLink>
 
-        <NavLink class="nav-link" href="orders">
-            📦 Orders
-        </NavLink>
-
-        <div class="nav-item px-2">
-            <NavLink class="nav-link text-white" href="/products">
-                🛍️ Products
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-2">
-            <NavLink class="nav-link text-white" href="cart">
-                🛒 Cart
-            </NavLink>
-        </div>
-
-    </nav>
-</div>
+    <NavLink class="ss-nav-link" href="/cart">
+        <span class="ss-nav-icon">🛒</span>
+        <span>Cart</span>
+    </NavLink>
+</nav>

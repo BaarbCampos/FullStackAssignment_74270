@@ -1,18 +1,23 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
+<div class="ss-layout">
+    <aside class="ss-sidebar">
         <NavMenu />
-    </div>
+    </aside>
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>
+    <main class="ss-main">
+        <header class="ss-topbar">
+            <div class="ss-topbar-title">
+                <h1>SportsStore</h1>
+                <span>Customer Portal</span>
+            </div>
 
-        <article class="content px-4">
+            <a class="ss-topbar-link" href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+        </header>
+
+        <section class="ss-page-content">
             @Body
-        </article>
+        </section>
     </main>
 </div>
 

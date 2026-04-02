@@ -5,55 +5,86 @@
 
 @inject HttpClient Http
 
-<h3>Order Details</h3>
+<PageTitle>Order Details</PageTitle>
+
+<div class="page-header">
+    <h2>Order Details</h2>
+    <p>Detailed information about your selected order.</p>
+</div>
 
 @if (order == null)
 {
-    <p>Loading...</p>
+    <div class="content-card">
+        <p class="mb-0 text-muted">Loading order details...</p>
+    </div>
 }
 else
 {
-    <div class="card p-3 mb-4">
-        <p><strong>Order ID:</strong> @order.Id</p>
-        <p><strong>Email:</strong> @order.CustomerEmail</p>
-        <p>
-            <strong>Status:</strong>
-            <span class="@GetStatusClass(order.Status)">
-                @GetStatusName(order.Status)
-            </span>
-        </p>
-        <p><strong>Total:</strong> €@order.TotalAmount</p>
-        <p><strong>Date:</strong> @order.CreatedAtUtc.ToLocalTime()</p>
+    <div class="content-card">
+        <div class="order-info-row">
+            <div class="order-info-item">
+                <span>Order ID</span>
+                <strong>@order.Id</strong>
+            </div>
+
+            <div class="order-info-item">
+                <span>Email</span>
+                <strong>@order.CustomerEmail</strong>
+            </div>
+
+            <div class="order-info-item">
+                <span>Status</span>
+                <strong>
+                    <span class="@GetStatusClass(order.Status)">
+                        @GetStatusName(order.Status)
+                    </span>
+                </strong>
+            </div>
+
+            <div class="order-info-item">
+                <span>Total</span>
+                <strong>€@order.TotalAmount.ToString("0.00")</strong>
+            </div>
+
+            <div class="order-info-item">
+                <span>Date</span>
+                <strong>@order.CreatedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</strong>
+            </div>
+        </div>
     </div>
 
-    <h4>Items</h4>
+    <div class="table-card">
+        <h4 class="mb-3">Items</h4>
 
-    @if (order.Items == null || !order.Items.Any())
-    {
-        <p>No items found for this order.</p>
-    }
-    else
-    {
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Product</th>
-                    <th>Quantity</th>
-                    <th>Unit Price</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var item in order.Items)
-                {
-                    <tr>
-                        <td>@item.ProductName</td>
-                        <td>@item.Quantity</td>
-                        <td>€@item.UnitPrice</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    }
+        @if (order.Items == null || !order.Items.Any())
+        {
+            <p class="text-muted mb-0">No items found for this order.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Quantity</th>
+                            <th>Unit Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in order.Items)
+                        {
+                            <tr>
+                                <td>@item.ProductName</td>
+                                <td>@item.Quantity</td>
+                                <td>€@item.UnitPrice.ToString("0.00")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
 }
 
 @code {
@@ -92,8 +123,8 @@ else
         {
             10 => "badge bg-success",
             11 => "badge bg-danger",
-            5 or 8 => "badge bg-warning",
-            _ => "badge bg-info"
+            5 or 8 => "badge bg-warning text-dark",
+            _ => "badge bg-info text-dark"
         };
     }
 
